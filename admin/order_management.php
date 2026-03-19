@@ -2,7 +2,7 @@
     require __DIR__ . "/../config/db.php";
     $orders = [];
     $error_message ="";
-    $limit = 9;
+    $limit = 8;
 $page = isset($_GET['page']) ? max(1,intval($_GET['page'])) : 1;
 $offset = ($page -1) * $limit;
 $count_sql = "SELECT COUNT(*) as total FROM (
