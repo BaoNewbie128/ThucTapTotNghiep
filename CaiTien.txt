@@ -1,0 +1,5 @@
+Cần cải thiện reload trang trong lúc gõ thanh tìm kiếm, filter không reload trang
+Thêm api thanh toán ngân hàng thật (Nếu khả thi,vì éo đủ tiền demo)
+Cải thiện giảm giá
+Thêm phân trang sản phẩm
+Ở phía admin có danh mục sản phẩm theo hãng,tỉ lệ,màu sắc

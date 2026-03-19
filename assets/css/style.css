@@ -1,0 +1,164 @@
+.card-img-top {
+        width: 100%;
+        height: 180px;
+        object-fit: cover;
+    }
+
+/* Global theme */
+:root{
+    --primary: #00d4ff; /* cyan */
+    --accent: #16213e; /* deep indigo */
+    --bg: #f6f8fa;
+    --muted:#6c757d;
+    --danger: #ff4757;
+}
+
+html,body{
+    height:100%;
+}
+
+body{
+    background-color:var(--bg);
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    color: #212529;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+}
+
+/* Header / navbar */
+.transparent-header{background: rgba(26,26,46,0.6); backdrop-filter: blur(8px); box-shadow:0 6px 18px rgba(0,0,0,0.12);}
+.brand-title{font-size:1.6rem; font-weight:900; color:var(--primary); letter-spacing:2px; text-shadow:0 2px 6px rgba(0,0,0,0.25);padding: 10px;}
+nav a.nav-btn{color:#fff; font-weight:600; text-decoration:none;margin: 8px; padding:8px 14px; border-radius:6px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.03); transition:all .18s ease}
+nav a.nav-btn:hover{background:var(--primary); color:#000; transform:translateY(-1px)}
+nav a.primary-cta{background:var(--primary); color:#000; border-color:var(--primary)}
+.profile-img{height: 20px; width: 20px;color: #ddd;}
+.home-img{height: 20px; width: 20px;color: #ddd;}
+.cart-img{height: 20px; width: 20px;}
+.order-img{height: 20px; width: 20px;}
+.jdm-img{height:40px; width: 40px;}
+.index-img{height:70px; width: 70px;}
+aside nav a.nav-btn {
+    color: #333 !important;
+    background: transparent;
+    border:1px solid #ddd;
+}
+
+aside nav a.nav-btn:hover {
+    background: #e6e6e6;
+    color: #000 !important;
+    transform: none;
+}
+
+/* Containers and layout helpers */
+.app-container{max-width:1200px; margin:0 auto; padding:30px 16px}
+.page-title{font-size:1.4rem; font-weight:800; margin-bottom:18px; color:#111}
+
+/* Cards */
+.card{border-radius:12px; overflow:hidden}
+.card .card-body{padding:18px}
+.card-title{font-weight:700; font-size:1rem}
+
+/* Forms */
+.form-label{font-weight:600}
+.form-control{border-radius:8px; padding:10px 12px; box-shadow:none; border:1px solid #e6e9ee}
+.form-control:focus{box-shadow:0 0 0 0.15rem rgba(0,212,255,0.14); border-color:var(--primary)}
+.btn{border-radius:8px}
+
+/* Footer */
+footer.site-footer{padding:18px 12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.12); text-align:center;}
+.transparent-footer {
+    background: rgba(26,26,46,0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 -6px 18px rgba(0,0,0,0.12);
+    color: #fff;
+    padding: 18px 12px;
+    text-align: left; /* FIX */
+}
+.footer-grid {
+    display: flex;
+    justify-content: flex-start; /* Canh trái */
+    gap: 160px; /* giữ khoảng cách giữa 2 cột */
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.footer-bottom{
+    /* text-align: center; */
+    padding-left: 20px;
+}
+
+
+/* Small helpers */
+.muted{color:var(--muted)}
+.product-img{height:200px; object-fit:cover; border-bottom:1px solid #f1f3f5}
+.card .price{font-weight:800; color:#c92a2a}
+
+/* Responsive Design */
+@media (max-width:1024px){
+    .app-container{padding:20px}
+    .transparent-header{padding: 15px 20px !important;}
+    .brand-title{font-size:1.4rem}
+    nav a.nav-btn{padding:6px 12px; font-size:0.9rem}
+    .col-lg-4{flex: 0 0 calc(33.333% - 12px) !important; width: calc(33.333% - 12px) !important;}
+}
+
+@media (max-width:768px){
+    .brand-title{font-size:1.2rem; letter-spacing:1px}
+    .app-container{padding:15px}
+    nav{flex-direction: column; gap: 8px !important}
+    nav a.nav-btn{width:100%; text-align:center; padding:10px 8px}
+    .card{margin-bottom:12px}
+    .product-img{height:150px}
+    .row.g-3{gap:12px !important}
+    .row.g-4{gap:12px !important}
+    .col-md-3, .col-md-9, .col-md-6{width:100% !important}
+    .col-lg-4{flex: 0 0 calc(50% - 6px) !important; width: calc(50% - 6px) !important;}
+    .display-6{font-size:1.5rem !important}
+}
+
+@media (max-width:576px){
+    body{font-size:14px}
+    .brand-title{font-size:0.95rem; letter-spacing:0px}
+    .transparent-header{padding: 8px 10px !important;}
+    nav{display:flex !important; flex-wrap:wrap; gap:3px !important; width:auto; justify-content:flex-end;}
+    nav a.nav-btn{padding:5px 8px !important; font-size:0.8rem !important; margin:0 !important;}
+    .page-title{font-size:1.1rem; margin-bottom:12px}
+    .app-container{padding:10px}
+    .card .card-body{padding:12px}
+    .form-control{padding:8px 10px; font-size:14px}
+    .btn{padding:8px 12px; font-size:0.9rem}
+    .product-img{height:120px}
+    .display-6{font-size:1.3rem !important}
+    .row row-cols-md-3{flex-direction:column}
+    .col-lg-4{flex: 0 0 100% !important; width: 100% !important}
+    .col{flex:0 0 100% !important}
+    .table{font-size:0.85rem}
+    table th, table td{padding:6px 4px !important}
+    .alert{padding:10px 12px; font-size:0.9rem}
+    footer.site-footer{padding:12px 8px}
+    .card p{margin-bottom:8px}
+    h1,h2,h3,h4,h5,h6{margin-bottom:8px}
+    /* Mobile navbar optimization */
+    .navbar-brand{font-size:1.1rem !important;}
+    .nav-link{font-size:0.95rem; padding:0.5rem 0.75rem !important;}
+    .form-control{margin-bottom:8px;}
+    .modal-dialog{margin:0 8px;}
+}
+
+@media (max-width:400px){
+    .brand-title{font-size:0.8rem; letter-spacing:0px;}
+    .transparent-header{padding: 6px 8px !important;}
+    body{font-size:13px}
+    nav a.nav-btn{padding:4px 6px !important; font-size:0.75rem !important; margin:0 !important;}
+    .page-title{font-size:1rem}
+    .card .card-body{padding:10px}
+    .form-control{padding:6px 8px; font-size:12px}
+    .btn{padding:6px 10px; font-size:0.85rem}
+    .product-img{height:100px}
+    .modal-dialog{margin:10px}
+    .display-6{font-size:1.2rem !important}
+    footer.site-footer{padding:6px 8px; font-size:0.85rem;}
+    /* Cart mobile card images */
+    .d-md-none .col-4 img{height:90px; object-fit:cover;}
+}
