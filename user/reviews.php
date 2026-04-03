@@ -1,6 +1,13 @@
 <?php
+session_start();
 include __DIR__ ."/../includes/auth_check.php";
 require_once __DIR__ . "/../config/db.php";
+if(!isset($_GET['back_url'])){
+    $_SESSION['back_url'] =$_SERVER['HTTP_REFERER'] ?? 'dashboard.php';
+}
+if(isset($_GET['back_url'])){
+    $_SESSION['back_url'] = $_GET['back_url'];
+}
     if(!isset($_GET['product_id'])){
         die("<div class='alert alert-danger text-center'>Thiếu product_id!</div>");
     }
@@ -74,38 +81,41 @@ require_once __DIR__ . "/../config/db.php";
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
 </head>
 
-<body class="bg-light">
-    <div class="container py-4">
-        <a href="dashboard.php" class="btn btn-secondary">Quay lại</a>
-    </div>
-    <div class="modal fade show" id="reviewModal" tabindex="1" aria-labelledby="reviewModelLabel" aria-modal="true"
-        style="display: block;">
+<body>
+    <div class="modal fade" id="reviewModal" tabindex="1">
         <div class="modal-dialog modal-dialog-scrollable modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
                         Đánh giá sản phẩm
                         <?= htmlspecialchars($prod['brand'] . ' ' . $prod['model']) ?>
+                        <img src="../images/<?= htmlspecialchars($prod['image']) ?>" alt="car"
+                            style="width: 100px; height: 70px; object-fit: cover; border-radius: 6px;" class="me-3">
                     </h5>
-                    <a href="dashboard.php" class="btn-close"></a>
+                    <a href="<?= $_SESSION['back_url']  ??'dashboard.php' ?> " class="btn-close"></a>
                 </div>
                 <div class="modal-body">
                     <?= $message ?>
                     <h5 class="fw-bold mb-3">Viết đánh giá của bạn</h5>
                     <form method="POST" class="mb-4">
-                        <label class="form-label fw-bold">Thang điểm đánh giá</label>
-                        <select name="rating" class="form-select mb-2" style="width: 150px;">
-                            <option value="10">10</option>
-                            <option value="9">9</option>
-                            <option value="8">8</option>
-                            <option value="7">7</option>
-                            <option value="6">6</option>
-                            <option value="5">5</option>
-                            <option value="4">4</option>
-                            <option value="3">3</option>
-                            <option value="2">2</option>
-                            <option value="1">1</option>
-                        </select>
+                        <div class="d-flex align-items-center mb-3">
+                            <!-- Ảnh xe -->
+
+                            <div>
+                                <select name="rating" class="form-select mb-2" style="width: 150px;">
+                                    <option value="10">10</option>
+                                    <option value="9">9</option>
+                                    <option value="8">8</option>
+                                    <option value="7">7</option>
+                                    <option value="6">6</option>
+                                    <option value="5">5</option>
+                                    <option value="4">4</option>
+                                    <option value="3">3</option>
+                                    <option value="2">2</option>
+                                    <option value="1">1</option>
+                                </select>
+                            </div>
+                        </div>
                         <textarea name="comment" class="form-control mb-3" rows="4"
                             placeholder="Viết đánh giá của bạn ở đây..." required></textarea>
                         <button type="submit" class="btn btn-primary">Gửi đánh giá</button>
@@ -145,7 +155,7 @@ require_once __DIR__ . "/../config/db.php";
                     <?php endif; ?>
                 </div>
                 <div class="modal-footer">
-                    <a href="dashboard.php" class="btn btn-secondary">Đóng</a>
+                    <a href="<?= $_SESSION['back_url'] ??'dashboard.php' ?>" class="btn btn-secondary">Đóng</a>
                 </div>
             </div>
         </div>

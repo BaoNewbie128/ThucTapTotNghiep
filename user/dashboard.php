@@ -185,8 +185,14 @@ if ($result === FALSE) {
                                 class="order-img" alt="đơn hàng"> Đơn hàng</a></li>
                     <li class="nav-item"><a class="nav-link" href="dashboard.php?view=profile"><img
                                 src="../images/profile.png" class="profile-img" alt="hồ sơ cá nhân"> Hồ sơ</a></li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="wishlist.php">
+                            ❤️ Yêu thích
+                        </a>
+                    </li>
                     <li class="nav-item"><a class="nav-link text-danger" href="/logout.php"><img
                                 src="../images/logout.png" alt="đăng xuất"> Đăng xuất</a></li>
+
                 </ul>
             </div>
         </div>
@@ -255,6 +261,10 @@ if ($result === FALSE) {
                         </button>
                         <a href="reviews.php?product_id=<?= $first_id ?>" class="btn btn-secondary w-100">Xem đánh
                             giá</a>
+                        <a href="wishlist_add.php?product_id=<?= $first_id ?>"
+                            class="btn btn-outline-danger w-100 mb-2">
+                            ❤️ Yêu thích
+                        </a>
                     </div>
                 </div>
             </div>

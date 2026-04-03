@@ -1,6 +1,6 @@
 <?php
 include  "config/db.php";
-
+require_once __DIR__ . "/validation.php";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     $username = trim($_POST["username"]?? "");
@@ -9,15 +9,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $phone = trim($_POST["phone"] ?? "");
     $address = trim($_POST["address"] ?? "");
     $role = "customer"; // mặc định khách hàng
-    if ($username ==="" || $email ==="" || $password==="") {
+    if (!\Validator::required($username) || !\Validator::required($email) || !\Validator::required($password)) {
         $error = "Vui lòng nhập đầy đủ thông tin!";
     }
     // Kiểm tra định dạng email
-    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    elseif (!\Validator::email($email)) {
         $error = "Email không đúng định dạng!";
     }
-    // Kiểm tra độ dài mật khẩu
-    elseif (strlen($password) < 6) {
+    // Kiểm tra độ dài mật khẩu dấu gạch ở Validator là để lấy gloBal không báo lỗi 
+    elseif (!\Validator::minLength($password, 6)) {
         $error = "Mật khẩu phải có ít nhất 6 ký tự!";
     }else{
  // kiểm tra email/username trùng
