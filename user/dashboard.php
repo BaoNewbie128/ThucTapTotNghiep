@@ -42,6 +42,7 @@ if ($search_query !== '') {
         OR description LIKE '%$s%'
         OR image LIKE '%$s%'
         OR color LIKE '%$s%'
+        OR price = '$s'
     )";
 }
 if ($filter_brand !== '' && $filter_brand !== 'all') {
@@ -223,6 +224,17 @@ if ($result === FALSE) {
                     // id dùng cho modal (lấy id đầu tiên nếu có)
                     $first_id = isset($p['ids_list'][0]) ? $p['ids_list'][0] : '0';
                     $modal_id = 'modal-' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $first_id);
+
+                    // Lấy đánh giá cho sản phẩm
+                    $reviews = [];
+                    $sql_reviews = "SELECT r.rating, r.comment, r.created_at, u.username FROM reviews r JOIN users u ON r.user_id = u.id WHERE r.product_id = $first_id ORDER BY r.created_at DESC LIMIT 10";
+                    $review_result = $conn->query($sql_reviews);
+                    if ($review_result) {
+                        while ($rev = $review_result->fetch_assoc()) {
+                            $reviews[] = $rev;
+                        }
+                        $review_result->free();
+                    }
                 ?>
             <div class="col-lg-4 col-md-6 col-sm-12 mb-4">
                 <div class="card shadow-sm h-100">
@@ -259,10 +271,10 @@ if ($result === FALSE) {
                             data-bs-target="#chooseColor<?= $first_id ?>">
                             Thêm vào giỏ hàng
                         </button>
-                        <a href="reviews.php?product_id=<?= $first_id ?>" class="btn btn-secondary w-100">Xem đánh
-                            giá</a>
+                        <button class="btn btn-secondary w-100" data-bs-toggle="modal"
+                            data-bs-target="#reviewModal<?= $first_id ?>">Xem đánh giá</button>
                         <a href="wishlist_add.php?product_id=<?= $first_id ?>"
-                            class="btn btn-outline-danger w-100 mb-2">
+                            class="btn btn-outline-danger w-100 mb-2 mt-2">
                             ❤️ Yêu thích
                         </a>
                     </div>
@@ -335,6 +347,48 @@ if ($result === FALSE) {
                         </div>
                         <div class="modal-body">
                             <?= nl2br(htmlspecialchars($p['description'] ?? '')) ?>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal đánh giá -->
+            <div class="modal fade" id="reviewModal<?= $first_id ?>" tabindex="-1"
+                aria-labelledby="reviewModalLabel<?= $first_id ?>" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="reviewModalLabel<?= $first_id ?>"> <?= $full_name ?>
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <?php if (!empty($reviews)): ?>
+                            <?php foreach ($reviews as $rev): ?>
+                            <div class="card mb-3 shadow-sm">
+                                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                    <strong class="text-primary"><?= htmlspecialchars($rev['username']) ?></strong>
+                                    <div class="d-flex align-items-center">
+                                        <?php for ($i = 1; $i <= $rev['rating']; $i++): ?>
+                                        <span class="text-warning">⭐</span>
+                                        <?php endfor; ?>
+                                        <span class="ms-2 badge bg-secondary"><?= $rev['rating'] ?>/10</span>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <p class="card-text mb-2"><?= nl2br(htmlspecialchars($rev['comment'])) ?></p>
+                                    <small class="text-muted">Đã đăng: <?= $rev['created_at'] ?></small>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+                            <?php else: ?>
+                            <div class="alert alert-info text-center">
+                                <i class="bi bi-chat-dots"></i> Chưa có đánh giá nào cho sản phẩm này.
+                            </div>
+                            <?php endif; ?>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>

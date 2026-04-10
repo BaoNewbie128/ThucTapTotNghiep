@@ -24,11 +24,12 @@
           if($conn->query($sql) === TRUE){
               $success = "Cập nhật sản phẩm thành công!";
               $product = $conn->query("SELECT * FROM products WHERE id = $id")->fetch_assoc();
+                header("Location: admin_dashboard.php?view=products");
+              exit; 
           } else {
               $error_message = "Lỗi: " . $sql . "<br>" . $conn->error;
           }
-              header("Location: admin_dashboard.php?view=products");
-    exit; 
+
     }
 ?>
 <a href="admin_dashboard.php?view=products" class="btn btn-secondary mb-3">Quay lại</a>

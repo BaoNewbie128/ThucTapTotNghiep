@@ -89,13 +89,20 @@ $conn->close();
         $modal_id = 'modal-' . $p['id'];
          $short_description = truncate_description($p['description'], 20); ?>
     <div class="col-lg-4 col-md-6 col-sm-12 mb-3">
-        <div class="card shadow-sm h-100 d-flex flex-column">
+        <div
+            class="card shadow-sm h-100 d-flex flex-column <?php if ($p["stock"] < 10): ?>border-danger<?php endif; ?></div>">
             <img src="/../images/<?= $p['image'] ?>" class="card-img-top" style="height: 180px; object-fit: cover;">
             <div class="card-body d-flex flex-column flex-grow-1">
                 <h5 class="card-title" style="font-size: 1rem; margin-bottom: 8px;">
                     <?= $p["brand"] . " " . $p["model"] ?></h5>
                 <p class="text-muted small mb-1">Tỉ lệ: <?= $p["scale"] ?></p>
-                <p class="text-muted small mb-2">Số lượng: <?= $p["stock"] ?></p>
+                <p class="text-muted small mb-2">Số lượng:
+                    <?php if ($p["stock"] < 10): ?>
+                    <span class="text-danger fw-bold"><?= $p["stock"] ?> (Sắp hết!)</span>
+                    <?php else: ?>
+                    <span class="text-success"><?= $p["stock"] ?></span>
+                    <?php endif; ?>
+                </p>
                 <p class="text-muted small mb-2">Màu: <strong><?= $p["color"] ?></strong></p>
                 <p class="fw-bold text-danger mb-2" style="font-size: 1.1rem;"><?= format_currency($p["price"]) ?></p>
                 <p class="card-text small mb-3 flex-grow-1">

@@ -43,7 +43,17 @@
         if($action == 'paid'){
     $sql_paid = "UPDATE orders SET status = 'paid' WHERE id = $order_id";
     if($conn->query($sql_paid) === true){
+        // Trừ stock
+        $items_query = $conn->query("SELECT product_id, quantity FROM order_items WHERE order_id = $order_id");
+        if($items_query->num_rows > 0){
+            while($item = $items_query->fetch_assoc()){
+                $product_id = $item['product_id'];
+                $quantity = $item['quantity'];
+                $conn->query("UPDATE products SET stock = stock - $quantity WHERE id = $product_id");
+            }
+        }
         $_SESSION['message'] = "Thanh toán thành công!";
+        $_SESSION['show_thank_you'] = true;
     } else {
         $_SESSION['message'] = "Lỗi khi cập nhật thanh toán.";
     }
@@ -110,6 +120,7 @@
                                 <th>Màu</th>
                                 <th>Giá</th>
                                 <th>Tổng</th>
+                                <th>Hành động</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -122,11 +133,21 @@
                             <tr>
                                 <td width="120"><img src="../images/<?= $row['image'] ?>" width="100"
                                         style="object-fit: cover;"></td>
-                                <td><?= $row["brand"] . " " . $row["model"] ?></td>
+                                <td style="margin-top: 5px;"><?= $row["brand"] . " " . $row["model"] ?></td>
                                 <td><?= $row["quantity"] ?></td>
                                 <td><?= $row["color"] ?></td>
-                                <td><?= number_format($row["price"]) ?>₫</td>
-                                <td><?= number_format($subtotal) ?>₫</td>
+                                <td class="fw-bold"><?= number_format($row["price"]) ?>₫</td>
+                                <td class="fw-bold"><?= number_format($subtotal) ?>₫</td>
+                                <td class="text-center">
+                                    <?php if($order['status'] === 'paid' || $order['status'] === 'completed' || $order['status'] === 'shipping'): ?>
+                                    <a href="reviews.php?product_id=<?= $row['product_id'] ?>&back_url=order_items.php"
+                                        class="btn btn-sm btn-outline-primary fw-bold mt-3">
+                                        <i class="bi bi-star"></i> Đánh giá
+                                    </a>
+                                    <?php else: ?>
+                                    <span class="text-muted small">-</span>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                             <?php endwhile; ?>
                             <?php else: ?>
@@ -160,7 +181,13 @@
                                 <p class="mb-1 small">Số lượng: <strong><?= $row["quantity"] ?></strong></p>
                                 <p class="mb-1 small">Màu: <strong><?= $row["color"] ?></strong></p>
                                 <p class="mb-1 small">Giá: <strong><?= number_format($row["price"]) ?>₫</strong></p>
-                                <p class="text-danger fw-bold">Tổng: <?= number_format($subtotal) ?>₫</p>
+                                <p class="mb-2 text-danger fw-bold">Tổng: <?= number_format($subtotal) ?>₫</p>
+                                <?php if($order['status'] === 'paid' || $order['status'] === 'completed' || $order['status'] === 'shipping'): ?>
+                                <a href="reviews.php?product_id=<?= $row['product_id'] ?>&back_url=order_items.php"
+                                    class="btn btn-sm btn-outline-primary fw-bold w-100">
+                                    <i class="bi bi-star"></i> Viết đánh giá
+                                </a>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -182,15 +209,19 @@
                     Hủy đơn hàng
                 </a>
                 <?php endif; ?>
-                <?php if($order['status'] !== 'paid'): ?>
+                <?php if($order['status'] === 'pending'): ?>
                 <button class="btn btn-success btn-sm w-20" onclick="toggleQR(<?= $order['id'] ?>, <?= $total ?>)">
                     Thanh Toán
                 </button>
                 <?php elseif($order['status'] === 'paid'): ?>
-                <p class="text-success fw-bold d-inline-block m-0">Đã thanh toán</p>
+                <p class="fw-bold d-inline-block m-0">Trạng thái đơn hàng : </p>
+                <p class="text-success fw-bold d-inline-block m-0">
+                    Đã thanh toán</p>
                 <?php elseif($order['status'] === 'shipping'): ?>
+                <p class="fw-bold d-inline-block m-0">Trạng thái đơn hàng : </p>
                 <p class="text-success fw-bold d-inline-block m-0">Đang giao hàng </p>
                 <?php elseif($order['status'] === 'completed'): ?>
+                <p class="fw-bold d-inline-block m-0">Trạng thái đơn hàng : </p>
                 <p class="text-success fw-bold d-inline-block m-0">Đã nhận hàng </p>
                 <?php endif; ?>
                 <!-- Toggle QR -->
@@ -233,6 +264,71 @@
             .then(res => window.location.reload());
     }
     </script>
+
+    <?php if (isset($_SESSION['show_thank_you']) && $_SESSION['show_thank_you']): ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var thankYouModal = new bootstrap.Modal(document.getElementById('thankYouModal'));
+        thankYouModal.show();
+    });
+    </script>
+    <?php unset($_SESSION['show_thank_you']); ?>
+    <?php endif; ?>
+
+    <style>
+    /* Review Button Styling */
+    .btn-outline-primary {
+        border-width: 1.5px;
+        transition: all 0.3s ease;
+    }
+
+    .btn-outline-primary:hover {
+        background-color: #0d6efd;
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);
+    }
+
+    .btn-sm {
+        padding: 0.4rem 0.8rem;
+        font-size: 0.875rem;
+        border-radius: 6px;
+    }
+
+    /* Desktop table review action cell */
+    @media (min-width: 768px) {
+        td.text-center .btn {
+            min-width: 130px;
+        }
+    }
+
+    /* Mobile button full width styling */
+    @media (max-width: 767px) {
+        .btn-outline-primary {
+            display: block;
+            margin-top: 0.5rem;
+        }
+    }
+    </style>
+
+    <!-- Modal cảm ơn -->
+    <div class="modal fade" id="thankYouModal" tabindex="-1" aria-labelledby="thankYouModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="thankYouModalLabel">Cảm ơn bạn đã mua hàng!</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Đơn hàng của bạn đã được thanh toán thành công. Cảm ơn bạn đã tin tưởng và sử dụng dịch vụ của
+                        chúng tôi!</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Đóng</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
 </body>
 

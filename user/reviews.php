@@ -14,6 +14,19 @@ if(isset($_GET['back_url'])){
     $product_id = intval($_GET['product_id']);
     $user_id = $_SESSION['user_id'];
     $message = "";
+    $message = "";
+
+if(isset($_GET['msg'])){
+    if($_GET['msg'] == 'deleted'){
+        $message = "<div class='alert alert-success text-center'>Đánh giá đã được xóa!</div>";
+    }
+    if($_GET['msg'] == 'updated'){
+        $message = "<div class='alert alert-success text-center'>Đánh giá đã được cập nhật!</div>";
+    }
+    if($_GET['msg'] == 'error'){
+        $message = "<div class='alert alert-danger text-center'>Có lỗi xảy ra!</div>";
+    }
+}
     $sql = "SELECT brand, model,image FROM products WHERE id = $product_id";
     $prod = $conn->query($sql)->fetch_assoc();
     if(!$prod){
@@ -25,9 +38,11 @@ if(isset($_GET['back_url'])){
         $check = $conn->query("SELECT * FROM reviews WHERE id = $review_id AND user_id = $user_id");
         if($check->num_rows ===1){
             $conn->query("DELETE FROM reviews WHERE id = $review_id");
-            $message = "<div class='alert alert-success text-center'>Đánh giá đã được xóa !</div>";
+            header("Location: reviews.php?product_id=$product_id&msg=deleted");
+            exit;
         }else{
-            $message = "<div class='alert alert-danger text-center'>Không thể xóa đánh giá này !</div>";
+            header("Location: reviews.php?product_id=$product_id&msg=error");
+            exit;
         }
     }
     // edit
@@ -41,10 +56,14 @@ if(isset($_GET['back_url'])){
         $check = $conn->query("SELECT * FROM reviews WHERE id = $review_id AND user_id = $user_id");
         if($check->num_rows ===1){
             $conn->query("UPDATE reviews SET comment='$new_comment', rating=$new_rating WHERE id = $review_id");
-            $message = "<div class='alert alert-success text-center'>Đánh giá đã được cập nhật !</div>";
+            header("Location: reviews.php?product_id=$product_id&msg=updated");
+            exit;
+            
         }else{
-            $message = "<div class='alert alert-danger text-center'>Không thể cập nhật đánh giá này !</div>";
-        }    
+            header("Location: reviews.php?product_id=$product_id&msg=error");
+            exit;
+            
+        } 
     }
 
     // create

@@ -1,5 +1,10 @@
-<?php include __DIR__ . "/../includes/auth_check.php";
+<?php 
+include __DIR__ . "/../includes/auth_check.php";
     include __DIR__ . "/../config/db.php";
+    if(isset($_GET['view']) && $_GET['view'] === 'edit' && $_SERVER['REQUEST_METHOD'] === 'POST'){
+    include __DIR__ . "/edit_product.php";
+    exit;
+}
     // Truy vấn tổng số lượng sản phẩm 
     $sql = "SELECT COUNT(*) AS total_products FROM products";
     $result = $conn->query($sql);
@@ -25,6 +30,18 @@
     $result5 = $conn->query($sql5);
     $row5 = $result5->fetch_assoc();
     $total_reviews = $row5['total_reviews'];
+
+    // Truy vấn sản phẩm sắp hết hàng (stock < 10)
+    $low_stock_sql = "SELECT id, brand, model, stock FROM products WHERE stock < 10 ORDER BY stock ASC LIMIT 10";
+    $low_stock_result = $conn->query($low_stock_sql);
+    $low_stock_products = [];
+    if ($low_stock_result) {
+        while ($row = $low_stock_result->fetch_assoc()) {
+            $low_stock_products[] = $row;
+        }
+        $low_stock_result->free();
+    }
+
     // $conn->close();
 ?>
 
@@ -39,6 +56,7 @@
     <title>Trang Chủ - Admin - JDM World</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="/assets/css/style.css">
 </head>
 
@@ -66,6 +84,8 @@
                                 src="../images/profile.png" alt="khách hàng" class="profile-img"> Quản lý khách hàng</a>
                         <a class="nav-link nav-btn" href="admin_dashboard.php?view=reviews">
                             <img src="../images/review.png" alt="đánh giá" class="profile-img"> Quản lý đánh giá</a>
+                        <a class="nav-link nav-btn" href="admin_dashboard.php?view=reports">
+                            <img src="../images/report.png" alt="báo cáo" class="profile-img"> Báo cáo thống kê</a>
                         <a class="nav-link nav-btn" href="admin_dashboard.php?view=users">
                             <img src="../images/admin.png" alt="người dùng" class="profile-img"> Quản lý người dùng</a>
                     </nav>
@@ -110,6 +130,9 @@
                     elseif(isset($_GET["view"]) && $_GET["view"] === "delete-user") {
                         include __DIR__ . "/delete_user.php";
                     }
+                    elseif(isset($_GET["view"]) && $_GET["view"] === "reports") {
+                        include __DIR__ . "/reports.php";
+                    }
                     else {
                 ?>
                 <div class="row row-cols-1 row-cols-md-3 g-4 mb-4">
@@ -144,6 +167,46 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Cảnh báo kho hàng -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-warning text-dark">
+                        <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Cảnh báo kho hàng</h5>
+                    </div>
+                    <div class="card-body">
+                        <?php if (!empty($low_stock_products)): ?>
+                        <p class="text-muted">Các sản phẩm sau có số lượng tồn kho dưới 10:</p>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Mẫu xe</th>
+                                        <th>Tồn kho</th>
+                                        <th>Hành động</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($low_stock_products as $product): ?>
+                                    <tr>
+                                        <td><?php echo htmlspecialchars($product['brand'] . ' ' . $product['model']); ?>
+                                        </td>
+                                        <td><span class="badge bg-danger"><?php echo $product['stock']; ?></span></td>
+                                        <td>
+                                            <a href="admin_dashboard.php?view=edit&id=<?php echo $product['id']; ?>"
+                                                class="btn btn-sm btn-primary">Cập nhật</a>
+                                        </td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                        <?php else: ?>
+                        <p class="text-success"><i class="bi bi-check-circle"></i> Tất cả sản phẩm đều có đủ tồn kho.
+                        </p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
                 <?php  
                     }
                 ?>
