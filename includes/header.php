@@ -96,12 +96,16 @@ if (session_status() === PHP_SESSION_NONE) {
                 <img src="/images/home.png" alt="trang chủ" class="profile-img" style="margin-right: 4px;"> Trang chủ
             </a>
             <div class="nav-separator"></div>
+            <?php if($_SESSION['role'] === 'customer'): ?>
             <a href="/user/profile.php" class="nav-btn" style="padding: 6px 10px; font-size: 0.9rem; margin: 0;">
                 <img src="/images/profile.png" alt="hồ sơ" class="profile-img" style="margin-right: 4px;"> Hồ sơ
             </a>
+            <?php endif; ?>
+            <?php if($_SESSION['role'] === 'customer'): ?>
             <a href="/user/orders.php" class="nav-btn" style="padding: 6px 10px; font-size: 0.9rem; margin: 0;">
                 <img src="/images/order.png" alt="đơn hàng" class="profile-img" style="margin-right: 4px;"> Đơn hàng
             </a>
+            <?php endif; ?>
             <a href="/logout.php" class="nav-btn"
                 style="background: linear-gradient(135deg, var(--danger) 0%, #ff6b7b 100%); border-color: var(--danger); padding: 6px 10px; font-size: 0.9rem; margin: 0;">
                 <img src="/images/logout.png" alt="đăng xuất" class="profile-img" style="margin-right: 4px;"> Đăng xuất
