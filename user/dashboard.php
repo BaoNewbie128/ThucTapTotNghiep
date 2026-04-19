@@ -72,7 +72,7 @@ SELECT
     GROUP_CONCAT(color ORDER BY id SEPARATOR '||') AS colors,
     model,
     scale,
-    MIN(price) AS price, -- show min price for group
+    GROUP_CONCAT(price ORDER BY id SEPARATOR '||') AS prices, -- show min price for group
     GROUP_CONCAT(stock ORDER BY id SEPARATOR '||') AS stocks,
     GROUP_CONCAT(image ORDER BY id SEPARATOR '||') AS images,
     description
@@ -100,6 +100,9 @@ if ($result === FALSE) {
             $row['ids_list']    = $row['ids'] === '' ? [] : explode('||', $row['ids']);
             $row['colors_list'] = $row['colors'] === '' ? [] : explode('||', $row['colors']);
             $row['images_list'] = $row['images'] === '' ? [] : explode('||', $row['images']);
+              // Xử lý giá theo màu sắc biến thể 
+              $row['prices'] = $row['prices'] ?? '';
+            $row['prices_list'] = $row['prices'] === '' ? [] : explode('||', $row['prices']);
             $row['stocks_list'] = $row['stocks'] === '' ? [] : explode('||', $row['stocks']);
 
             // cover image = hình đầu tiên nếu có, else placeholder
@@ -216,7 +219,11 @@ if ($result === FALSE) {
             <?php if (!empty($products)): ?>
             <?php foreach ($products as $p): 
                     // bảo đảm các key tồn tại
-                    $price = format_currency($p['price'] ?? 0);
+                    $price = '';
+                    if (!empty($p['prices_list'])) {
+                        $min_price = min($p['prices_list']);
+                            $price =  format_currency($min_price);
+                        }
                     $image_path = htmlspecialchars($p['image_cover'] ?? 'placeholder.png');
                     $full_name = htmlspecialchars(($p['brand'] ?? '') . ' ' . ($p['model'] ?? ''));
                     $short_description = truncate_description($p['description'] ?? '', 20);
@@ -234,6 +241,13 @@ if ($result === FALSE) {
                             $reviews[] = $rev;
                         }
                         $review_result->free();
+                    }
+                    $count_reviews = 0;
+                    $sql_count = "SELECT COUNT(*) as total_reviews FROM reviews WHERE product_id = $first_id";
+                    $count_result = $conn->query($sql_count);
+                    if ($count_result) {
+                        $count_reviews = $count_result->fetch_assoc()['total_reviews'] ?? 0;
+                        $count_result->free();
                     }
                 ?>
             <div class="col-lg-4 col-md-6 col-sm-12 mb-4">
@@ -272,7 +286,7 @@ if ($result === FALSE) {
                             Thêm vào giỏ hàng
                         </button>
                         <button class="btn btn-secondary w-100" data-bs-toggle="modal"
-                            data-bs-target="#reviewModal<?= $first_id ?>">Xem đánh giá</button>
+                            data-bs-target="#reviewModal<?= $first_id ?>">Xem đánh giá (<?= $count_reviews ?>)</button>
                         <a href="wishlist_add.php?product_id=<?= $first_id ?>"
                             class="btn btn-outline-danger w-100 mb-2 mt-2">
                             ❤️ Yêu thích
@@ -291,12 +305,33 @@ if ($result === FALSE) {
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
                             <div class="modal-body">
-                                <?php if (!empty($p['colors_list'])): ?>
+                                <?php if(count($p['colors_list']) == 1):
+                                $only_pid = $p['ids_list'][0];
+                                $only_color = $p['colors_list'][0];
+                                $only_img = $p['images_list'][0] ?? $p['image_cover'];
+                                $only_stock = intval($p['stocks_list'][0] ?? 0);
+                               
+                                ?>
+                                <input type="hidden" name="product_id" value="<?= htmlspecialchars($only_pid) ?>">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div class="me-3" style="width:64px;height:48px">
+                                        <img src="../images/<?= htmlspecialchars($only_img) ?>"
+                                            style="max-width:100%;height:100%;object-fit:cover;">
+
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold">Màu: <?= htmlspecialchars($only_color) ?></div>
+                                        <div class="small text-muted">Còn: <?= $only_stock ?></div>
+                                        <p class="fw-bold text-danger"><?= $price ?></p>
+                                    </div>
+                                </div>
+                                <?php else: ?>
                                 <?php foreach ($p['colors_list'] as $index => $color): 
                                             $pid = $p['ids_list'][$index] ?? null;
                                             $stock = isset($p['stocks_list'][$index]) ? intval($p['stocks_list'][$index]) : 0;
                                             $img = isset($p['images_list'][$index]) ? $p['images_list'][$index] : $p['image_cover'];
                                             if ($pid === null) continue;
+                                            $price_item = isset($p['prices_list'][$index]) ? format_currency($p['prices_list'][$index]) : '';
                                         ?>
                                 <div class="d-flex align-items-center mb-2">
                                     <div class="form-check me-3">
@@ -309,15 +344,15 @@ if ($result === FALSE) {
                                             alt="<?= htmlspecialchars($color) ?>"
                                             style="max-width:100%;height:100%;object-fit:cover;">
                                     </div>
+
                                     <div>
-                                        <label for="opt<?= htmlspecialchars($pid) ?>"
-                                            class="form-label mb-0"><?= htmlspecialchars($color) ?></label>
+                                        <label for="opt<?= htmlspecialchars($pid) ?>" class="form-label mb-0">Màu:
+                                            <?= htmlspecialchars($color) ?></label>
                                         <div class="small text-muted">Còn: <?= $stock ?></div>
+                                        <div class="small text-danger fw-bold"><?= $price_item ?></div>
                                     </div>
                                 </div>
                                 <?php endforeach; ?>
-                                <?php else: ?>
-                                <div class="alert alert-info">Không có tuỳ chọn màu cho sản phẩm này.</div>
                                 <?php endif; ?>
                                 <div class="mt-3">
                                     <label class="form-label fw-bold">Số lượng</label>

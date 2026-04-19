@@ -1,5 +1,6 @@
 <?php
     require __DIR__ . "/../config/db.php";
+    require_once __DIR__ . "/../validation.php";
     $user_id = $_SESSION['user_id'];
     $success ="";
     $error_message = "";
@@ -13,47 +14,64 @@
     $phone = $user["phone"];
     $address = $user["address"];
     if($_SERVER['REQUEST_METHOD'] === 'POST'){
-        $username = trim($_POST['username']);
-        $email = trim($_POST['email']);
-        $phone = trim($_POST['phone']);
-        $address = trim($_POST['address']);
-        $new_password = trim($_POST['new_password'] ?? '');
-      
-        $sql = "SELECT password FROM users WHERE id = ?";
-        $stmt = $conn->prepare($sql);
+    $username = trim($_POST['username']);
+    $email = trim($_POST['email']);
+    $phone = trim($_POST['phone']);
+    $address = trim($_POST['address']);
+    $new_password = trim($_POST['new_password'] ?? '');
+
+    // VALIDATE
+    if(!\Validator::required($username)){
+        $error_message = "Tên không được để trống";
+    } elseif(!\Validator::email($email)){
+        $error_message = "Email không hợp lệ";
+    } elseif(!\Validator::isNumber($phone)){
+        $error_message = "SĐT phải là số";
+    } else {
+
+        // Lấy password cũ
+        $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
         $stmt->bind_param("i",$user_id);
         $stmt->execute();
-        $user = $stmt->get_result()->fetch_assoc();
-        $password = $user['password'];
+        $password = $stmt->get_result()->fetch_assoc()['password'];
+
+        // Nếu nhập password mới
         if(!empty($new_password)){
-            if(strlen($new_password)< 6){
-                die("Mật khẩu phải tối thiểu 6 ký tự");
+            if(!\Validator::minLength($new_password,6)){
+                $error_message = "Mật khẩu tối thiểu 6 ký tự";
+            } else {
+                $final_password = password_hash($new_password,PASSWORD_DEFAULT);
             }
-            $final_password = password_hash($new_password,PASSWORD_DEFAULT);
-        }else {
+        } else {
             $final_password = $password;
         }
-        $update = $conn->prepare("
-        UPDATE users 
-        SET username = ?,email = ?,phone = ?,address = ?,password = ?
-        WHERE id = ?");
-        $update->bind_param(
-            "sssssi",
-            $username,
-            $email,
-            $phone,
-            $address,
-            $final_password,
-            $user_id
-        );
-        if($update->execute()){
-            $success = "Cập nhật sản phẩm thành công!";
-        header("Location: dashboard.php?view=profile");
-            exit;
-        }else{
-            $error_message = "Lỗi cập nhật" . $conn->error;
+
+        if(empty($error_message)){
+            $update = $conn->prepare("
+                UPDATE users 
+                SET username = ?, email = ?, phone = ?, address = ?, password = ?
+                WHERE id = ?
+            ");
+            $update->bind_param("sssssi",
+                $username,
+                $email,
+                $phone,
+                $address,
+                $final_password,
+                $user_id
+            );
+
+            if($update->execute()){
+                    $_SESSION["username"] = $username;
+                    $_SESSION["email"] = $email;
+                header("Location: dashboard.php?view=profile");
+                exit;
+            } else {
+                $error_message = "Lỗi cập nhật: " . $conn->error;
+            }
         }
     }
+}
 ?>
 <a href="dashboard.php?view=profile" class="btn btn-secondary">Quay lại</a>
 <h2 style="color: blue; margin-bottom: 20px;">Chỉnh sửa thông tin người dùng</h2>
