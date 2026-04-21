@@ -299,7 +299,7 @@ if ($result === FALSE) {
             <div class="modal fade" id="chooseColor<?= $first_id ?>" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
-                        <form action="cart_add.php" method="GET">
+                        <form action="cart_add.php" method="POST">
                             <div class="modal-header">
                                 <h5 class="modal-title"><?= $full_name ?></h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

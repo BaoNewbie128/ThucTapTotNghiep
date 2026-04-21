@@ -24,10 +24,63 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION["username"] = $user["username"];
             $_SESSION["role"] = $user["role"];
             $_SESSION["email"] = $user["email"];
+// ===== XỬ LÝ PENDING CART =====
+if(isset($_SESSION['pending_cart'])){
+    $pending = $_SESSION['pending_cart'];
+    $product_id = intval($pending['product_id']);
+    $quantity = intval($pending['quantity']);
+    $user_id = $_SESSION["user_id"];
+
+    if($product_id > 0){
+        $checkProduct = $conn->query("SELECT id FROM products WHERE id = $product_id");
+
+        if($checkProduct->num_rows > 0){
+            $sql = "SELECT id FROM cart WHERE user_id = $user_id";
+            $result = $conn->query($sql);
+
+            if($result->num_rows > 0){
+                $cart_id = $result->fetch_assoc()["id"];
+            } else {
+                $conn->query("INSERT INTO cart (user_id) VALUES ($user_id)");
+                $cart_id = $conn->insert_id;
+            }
+
+            $sql2 = "SELECT quantity FROM cart_items 
+                     WHERE cart_id = $cart_id AND product_id = $product_id";
+            $result2 = $conn->query($sql2);
+
+            if($result2->num_rows > 0){
+                $conn->query("UPDATE cart_items 
+                              SET quantity = quantity + $quantity 
+                              WHERE cart_id = $cart_id AND product_id = $product_id");
+            } else {
+                $conn->query("INSERT INTO cart_items (cart_id, product_id, quantity) 
+                              VALUES ($cart_id, $product_id, $quantity)");
+            }
+        }
+    }
+
+    unset($_SESSION['pending_cart']);
+}
+// ===== XỬ LÝ WISHLIST =====
+if (isset($_SESSION['wishlist_pending'])) {
+    $product_id = intval($_SESSION['wishlist_pending']);
+    $user_id = $_SESSION['user_id'];
+
+    if ($product_id > 0) {
+        $stmt = $conn->prepare("INSERT IGNORE INTO wishlist (user_id, product_id) VALUES (?, ?)");
+        $stmt->bind_param("ii", $user_id, $product_id);
+        $stmt->execute();
+    }
+
+    unset($_SESSION['wishlist_pending']);
+}
+$redirect = $_SESSION['redirect_after_login'] ?? '/index.php';
+unset($_SESSION['redirect_after_login']);
             if ($user["role"] == "admin") {
                 header("Location: admin/admin_dashboard.php");
             } else {
-                header("Location: user/dashboard.php");
+                header("Location: $redirect");
             }
             exit;
         }else{
@@ -288,15 +341,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         Bạn chưa có tài khoản? <a href="register.php">Đăng ký tại đây</a>
                     </p>
 
-                    <a href="index.php" class="btn-secondary-link">← Quay lại</a>
-
-                    <div class="credentials-info">
-                        <p><strong>Tài khoản admin:</strong> baobao</p>
-                        <p><strong>Mật khẩu:</strong> 12345678</p>
-                        <hr style="margin: 10px 0; border: none; border-top: 1px solid rgba(0, 212, 255, 0.2);">
-                        <p><strong>Tài khoản user:</strong> tientien</p>
-                        <p><strong>Mật khẩu:</strong> 123456789</p>
-                    </div>
+                    <a href="index.php" class="btn-secondary-link">Quay lại</a>
                 </div>
             </div>
         </div>
@@ -304,3 +349,4 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </body>
 
 </html>
+<?php include "includes/footer.php" ?>

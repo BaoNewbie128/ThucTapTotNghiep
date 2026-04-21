@@ -5,7 +5,7 @@ error_reporting(E_ALL);
 require_once __DIR__ . "/../config/db.php";
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
+    header("Location: ../login.php");
     exit;
 }
 
@@ -17,7 +17,8 @@ if ($product_id <= 0) {
 }
 
 // Xóa wishlist
-$sql = "DELETE FROM wishlist WHERE user_id = ? AND product_id = ?";
+$sql = "DELETE FROM wishlist 
+        WHERE user_id = ? AND product_id = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("ii", $user_id, $product_id);
 

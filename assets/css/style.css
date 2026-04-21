@@ -886,3 +886,59 @@ footer.site-footer {
         object-fit: cover;
     }
 }
+/* Base badge */
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    transition: all 0.3s ease;
+}
+
+/* Icon */
+.status-badge .icon {
+    font-size: 14px;
+}
+
+/* Hover nhẹ */
+.status-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+/* Pending */
+.status-pending {
+    background: linear-gradient(135deg, #6c757d, #495057);
+}
+
+/* Paid (xanh lá + glow nhẹ) */
+.status-paid {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    animation: pulse-green 2s infinite;
+}
+
+/* Shipping (xanh dương + di chuyển nhẹ) */
+.status-shipping {
+    background: linear-gradient(135deg, #007bff, #0dcaf0);
+}
+
+/* Completed */
+.status-completed {
+    background: linear-gradient(135deg, #198754, #20c997);
+}
+
+/* Cancelled (đỏ) */
+.status-cancelled {
+    background: linear-gradient(135deg, #dc3545, #ff6b6b);
+}
+
+/* Animation glow */
+@keyframes pulse-green {
+    0% { box-shadow: 0 0 0 0 rgba(40,167,69,0.5); }
+    70% { box-shadow: 0 0 0 8px rgba(40,167,69,0); }
+    100% { box-shadow: 0 0 0 0 rgba(40,167,69,0); }
+}

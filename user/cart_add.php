@@ -1,16 +1,28 @@
 <?php
     session_start();
     require_once __DIR__ .  "/../config/db.php";
-    if(!isset($_SESSION["user_id"])){
-        header("Location: ../login.php");
+    $product_id = intval($_POST["product_id"]);
+    $quantity = isset($_POST["quantity"]) ? max(1, intval($_POST["quantity"])) : 1;
+        
+    if(!isset($_SESSION['user_id'])){
+        $_SESSION['pending_cart'] = [
+            "product_id" => $product_id,
+            "quantity" => $quantity
+        ];
+        $_SESSION['redirect_after_login'] =  $_SERVER['HTTP_REFERER'] ?? '/index.php';
+        header("Location: /login.php");
         exit;
     }
-    if(!isset($_GET["product_id"])){
-        die("Thiếu mã sản phẩm.");
-    }
+    if($product_id <= 0){
+    header("Location: /index.php");
+    exit;
+}
+$check = $conn->query("SELECT id FROM products WHERE id = $product_id");
+if($check->num_rows == 0){
+    header("Location: /index.php");
+    exit;
+}
     $user_id = $_SESSION["user_id"];
-    $product_id = intval($_GET["product_id"]);
-    $quantity = isset($_GET["quantity"]) ? max(1, intval($_GET["quantity"])) : 1;
     $sql = "SELECT id FROM cart WHERE user_id = $user_id";
     $result = $conn->query($sql);
     if($result->num_rows > 0){
@@ -29,6 +41,6 @@
         $conn->query("INSERT INTO cart_items (cart_id, product_id, quantity) 
                              VALUES ($cart_id, $product_id, $quantity)");
     }
-    header("Location: dashboard.php");
+    header("Location: /user/cart_item.php");
     exit;
 ?>

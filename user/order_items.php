@@ -6,7 +6,7 @@
         exit;
     }
     $user_id = $_SESSION["user_id"];
-     $sql = "SELECT id,total,status,created_at FROM orders WHERE user_id = $user_id AND status NOT IN ('cancelled') ORDER BY id DESC";
+     $sql = "SELECT id,total,status,created_at FROM orders WHERE user_id = $user_id AND status IN ('pending','paid','shipping') ORDER BY id DESC";
     $orders=$conn->query($sql);
     $orderlist = [];
     if($orders && $orders->num_rows >0){
@@ -23,18 +23,18 @@
     if(isset($_GET['action'])  && isset($_GET['id'])){
         $action = $_GET['action'];
         $order_id = intval($_GET['id']);
-        $isItemReturn_query = $conn->query("SELECT product_id,quantity FROM order_items WHERE order_id = $order_id");
-        if($isItemReturn_query->num_rows > 0){
-            while($item = $isItemReturn_query->fetch_assoc()){
-                $product_id = $item['product_id'];
-            $quantity = $item['quantity'];
-            $conn->query("UPDATE products SET stock = stock + $quantity WHERE id = $product_id");
-            }  
-        }
         if($action == 'delete_all'){
-            $sql_delete = "DELETE FROM order_items WHERE order_id = $order_id";
+            // LUÔN cộng lại stock dù action là gì để tránh lỗi stock khi hủy đơn hàng hoặc hủy sau khi đã thanh toán
+            $isItemReturn_query = $conn->query("SELECT product_id,quantity FROM order_items WHERE order_id = $order_id");
+            if($isItemReturn_query->num_rows > 0){
+                while($item = $isItemReturn_query->fetch_assoc()){
+                    $product_id = $item['product_id'];
+                $quantity = $item['quantity'];
+                $conn->query("UPDATE products SET stock = stock + $quantity WHERE id = $product_id");
+                }  
+            }
             $sql_update_order = "UPDATE orders SET status = 'cancelled' WHERE id = $order_id";
-            if($conn->query($sql_delete)===true && $conn->query($sql_update_order)===true){
+            if($conn->query($sql_update_order)===true){
                 $_SESSION['message'] = "Hủy đơn hàng thành công.";
             }else{
                 $_SESSION['message'] = "Lỗi khi hủy đơn hàng" . $conn->error;
@@ -76,6 +76,9 @@
 <body class="bg-light">
 
     <div class="app-container">
+        <a href="order_history.php" class="btn btn-primary mb-3">
+            Xem lịch sử mua hàng
+        </a>
         <h2 class="page-title mb-4">Đơn hàng của bạn</h2>
 
         <?php if(empty($orderlist)):?>
@@ -103,8 +106,10 @@
                     'cancelled' => 'Đã hủy'
                 ];
         ?>
+
         <div class="card mb-4 shadow-sm">
-            <div class="card-header bg-dark text-white">
+
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
                 <h6 class="mb-0">Đơn hàng #<?= $order['id'] ?> | <?= $order['created_at'] ?> | <span
                         class="badge bg-info"><?= $statusTrans[$order['status']] ?? 'Không xác định' ?></span></h6>
             </div>
@@ -161,6 +166,7 @@
                             </tr>
                         </tbody>
                     </table>
+
                 </div>
 
                 <!-- Mobile Card View -->
