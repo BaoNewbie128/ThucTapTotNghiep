@@ -3,7 +3,7 @@ session_start();
 include __DIR__ ."/../includes/auth_check.php";
 require_once __DIR__ . "/../config/db.php";
 if(!isset($_GET['back_url'])){
-    $_SESSION['back_url'] =$_SERVER['HTTP_REFERER'] ?? 'dashboard.php';
+    $_SESSION['back_url'] =$_SERVER['HTTP_REFERER'] ?? '/index.php';
 }
 if(isset($_GET['back_url'])){
     $_SESSION['back_url'] = $_GET['back_url'];
@@ -174,7 +174,7 @@ if(isset($_GET['msg'])){
                     <?php endif; ?>
                 </div>
                 <div class="modal-footer">
-                    <a href="<?= $_SESSION['back_url'] ??'dashboard.php' ?>" class="btn btn-secondary">Đóng</a>
+                    <a href="<?= $_SESSION['back_url'] ??'/index.php' ?>" class="btn btn-secondary">Đóng</a>
                 </div>
             </div>
         </div>

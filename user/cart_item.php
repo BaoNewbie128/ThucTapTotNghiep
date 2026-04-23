@@ -191,7 +191,7 @@
                     </div>
                     <div class="col-12 col-md-6 mt-3 mt-md-0">
                         <div class="d-flex gap-2 flex-column flex-md-row">
-                            <a href="dashboard.php" class="btn btn-secondary btn-sm flex-grow-1">Quay lại</a>
+                            <a href="/index.php" class="btn btn-secondary btn-sm flex-grow-1">Quay lại</a>
                             <a href="orders.php?action=checkout" class="btn btn-success btn-sm flex-grow-1">Đặt hàng</a>
                         </div>
                     </div>

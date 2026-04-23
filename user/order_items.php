@@ -254,7 +254,7 @@
         <?php endforeach; ?>
 
         <div class="mt-4">
-            <a href="dashboard.php" class="btn btn-secondary">Quay lại</a>
+            <a href="/index.php" class="btn btn-secondary">Quay lại</a>
         </div>
     </div>
     <script>

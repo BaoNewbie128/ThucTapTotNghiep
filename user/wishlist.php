@@ -47,7 +47,22 @@ while ($row = $result->fetch_assoc()) {
     $row['stocks_list'] = explode('||', $row['stocks']);
     $row['prices_list'] = explode('||', $row['prices']);
     $row['image_cover'] = $row['images_list'][0] ?? 'placeholder.png';
-
+    $first_id = $row['ids_list'][0];
+    $reviews =[];
+    $sql_reviews = "SELECT r.rating,r.comment,r.created_at,u.username FROM reviews r 
+    JOIN users u ON r.user_id = u.id 
+    WHERE r.product_id = $first_id 
+    ORDER BY r.created_at DESC LIMIT 10";
+    $review_ressult = $conn->query($sql_reviews);
+    if($review_ressult){
+        while($review = $review_ressult->fetch_assoc()){
+            $reviews[] = $review;
+        }
+    }
+    $row['reviews'] = $reviews;
+    $sql_count_reviews = "SELECT COUNT(*) AS total_reviews FROM reviews WHERE product_id = $first_id";
+    $count_result = $conn->query($sql_count_reviews);
+    $row['total_reviews'] = ($count_result) ? $count_result->fetch_assoc()['total_reviews'] : 0;
     $products[] = $row;
 }
 ?>
@@ -114,11 +129,10 @@ while ($row = $result->fetch_assoc()) {
                             Thêm vào giỏ
                         </button>
 
-                        <a href="reviews.php?product_id=<?= $first_id ?>&back_url=<?= urldecode($_SERVER['REQUEST_URI']) ?>"
-                            class="btn btn-secondary w-100 mb-2">
-                            Xem đánh giá
-                        </a>
-
+                        <button class="btn btn-secondary w-100 mb-2" data-bs-toggle="modal"
+                            data-bs-target="#reviewModal<?= $first_id ?>">
+                            Xem đánh giá (<?= $p['total_reviews'] ?>)
+                        </button>
                         <button class="btn btn-danger w-100 btn-remove" data-id="<?= $first_id ?>">
                             Xóa khỏi yêu thích
                         </button>
@@ -218,6 +232,45 @@ while ($row = $result->fetch_assoc()) {
             </div>
         </div>
 
+        <?php endforeach; ?>
+        <?php foreach ($products as $p): 
+            $full_name = $p['brand'] . " " . $p['model'];
+            $first_id = $p['ids_list'][0];
+        ?>
+        <div class="modal fade" id="reviewModal<?= $first_id ?>" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title"><?= $full_name ?> - Đánh giá</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+                        <?php if (!empty($p['reviews'])): ?>
+                        <?php foreach ($p['reviews'] as $rev): ?>
+                        <div class="card mb-3 shadow-sm">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <strong class="text-primary"><?= htmlspecialchars($rev['username']) ?></strong>
+                                <div>
+                                    <?php for ($i = 1; $i <= $rev['rating']; $i++): ?>⭐<?php endfor; ?>
+                                    <span class="ms-2 badge bg-secondary"><?= $rev['rating'] ?>/10</span>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <p class="card-text mb-2"><?= nl2br(htmlspecialchars($rev['comment'])) ?></p>
+                                <small class="text-muted">Đã đăng: <?= $rev['created_at'] ?></small>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+                        <?php else: ?>
+                        <div class="alert alert-info text-center">Chưa có đánh giá nào cho sản phẩm này.</div>
+                        <?php endif; ?>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <?php endforeach; ?>
     </div>
     <script>
