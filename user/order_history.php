@@ -94,7 +94,7 @@ $statusConfig = [
 
         <div class="card mb-4 shadow-sm">
             <div class="card-header bg-secondary text-white">
-                Đơn #<?= $order['id'] ?> | <?= $order['created_at'] ?> |
+                Đơn hàng #<?= $order['id'] ?> | <b>Thời gian đặt :</b> <?= $order['created_at'] ?> |
                 <?php $st = $statusConfig[$order['status']] ?? null; ?>
 
                 <span class="status-badge <?= $st['class'] ?>">

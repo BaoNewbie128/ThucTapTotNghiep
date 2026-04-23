@@ -9,7 +9,7 @@ $user = $stmt->get_result()->fetch_assoc();
 ?>
 
 <div class="mb-3">
-    <a class="btn btn-secondary btn-sm" href="dashboard.php">Quay lại</a>
+    <a class="btn btn-secondary btn-sm" href="/index.php">Quay lại</a>
 </div>
 
 <div class="card shadow-sm" style="max-width: 600px;">
@@ -43,10 +43,10 @@ $user = $stmt->get_result()->fetch_assoc();
         </div>
 
         <div class="d-grid gap-2 d-md-flex">
-            <a class="btn btn-warning flex-grow-1" href="dashboard.php?view=edit-profile&user_id=<?= $user_id ?>">
+            <a class="btn btn-warning flex-grow-1" href="/index.php?view=edit-profile&user_id=<?= $user_id ?>">
                 Chỉnh sửa thông tin
             </a>
-            <a class="btn btn-secondary flex-grow-1" href="dashboard.php">
+            <a class="btn btn-secondary flex-grow-1" href="/index.php">
                 Quay lại
             </a>
         </div>

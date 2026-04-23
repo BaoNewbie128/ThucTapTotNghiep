@@ -64,7 +64,7 @@
             if($update->execute()){
                     $_SESSION["username"] = $username;
                     $_SESSION["email"] = $email;
-                header("Location: dashboard.php?view=profile");
+                header("Location: /index.php?view=profile");
                 exit;
             } else {
                 $error_message = "Lỗi cập nhật: " . $conn->error;
@@ -73,7 +73,7 @@
     }
 }
 ?>
-<a href="dashboard.php?view=profile" class="btn btn-secondary">Quay lại</a>
+<a href="/index.php" class="btn btn-secondary">Quay lại</a>
 <h2 style="color: blue; margin-bottom: 20px;">Chỉnh sửa thông tin người dùng</h2>
 <?php if(!empty($success)) :?>
 <div class="alert alert-success"><?= $success ?></div>

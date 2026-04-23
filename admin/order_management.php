@@ -29,7 +29,8 @@ if ($result === FALSE) {
                     'paid' => 'Đã thanh toán',
                     'shipping' => 'Đang giao hàng',
                     'completed' => 'Hoàn thành',
-                    'cancelled' => 'Đã hủy'
+                    'cancelled' => 'Đã hủy',
+                    'pending_payment' => 'Chờ xác nhận thanh toán'
                 ];
 $conn->close();
 ?>

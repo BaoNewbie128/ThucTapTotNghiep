@@ -213,7 +213,7 @@ if ($result === FALSE) {
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link" href="/user/dashboard.php?view=profile">
+                        <a class="nav-link" href="/index.php?view=profile">
                             <img src="../images/profile.png" class="profile-img"> Hồ sơ
                         </a>
                     </li>

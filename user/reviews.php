@@ -111,7 +111,7 @@ if(isset($_GET['msg'])){
                         <img src="../images/<?= htmlspecialchars($prod['image']) ?>" alt="car"
                             style="width: 100px; height: 70px; object-fit: cover; border-radius: 6px;" class="me-3">
                     </h5>
-                    <a href="<?= $_SESSION['back_url']  ??'dashboard.php' ?> " class="btn-close"></a>
+                    <a href="<?= $_SESSION['back_url']  ??'/index.php.php' ?> " class="btn-close"></a>
                 </div>
                 <div class="modal-body">
                     <?= $message ?>

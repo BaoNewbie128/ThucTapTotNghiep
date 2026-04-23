@@ -12,12 +12,22 @@
     'paid'      => 'Đã thanh toán',
     'shipping'  => 'Đang giao hàng',
     'completed' => 'Hoàn thành',
-    'cancelled'  => 'Đã hủy'
+    'cancelled'  => 'Đã hủy',
+    'pending_payment' => 'Chờ xác nhận thanh toán'
 ];
 
     if($_SERVER['REQUEST_METHOD'] === 'POST'){
         $status = $conn->real_escape_string($_POST['status']);
         $sql = "UPDATE orders SET status='$status' WHERE id=$order_id";
+        if($status === 'paid'){
+    $items = $conn->query("SELECT product_id, quantity FROM order_items WHERE order_id = $order_id");
+
+    while($item = $items->fetch_assoc()){
+        $conn->query("UPDATE products 
+                      SET stock = stock - {$item['quantity']} 
+                      WHERE id = {$item['product_id']}");
+    }
+}
         if($conn->query($sql) === TRUE){
             $success = "Cập nhật trạng thái đơn hàng thành công!";
             $order = $conn->query("SELECT * FROM orders WHERE id = $order_id")->fetch_assoc();
@@ -28,11 +38,11 @@
         exit; 
     }
 ?>
-<a href="admin_dashboard.php?view=orders" class="btn btn-secondary mb-3">← Quay lại</a>
+<a href="admin_dashboard.php?view=orders" class="btn btn-secondary mb-3">Quay lại</a>
 <h2 style="color: blue; margin-bottom: 20px;">Chỉnh sửa trạng thái</h2>
 <h5 class="card-title">Đơn hàng #<?= $order_id ?></h5>
 <br />
-<form method="post">
+<form method="post" action="update_order_status.php?order_id=<?= $order_id ?>">
     <label for="status"><strong>Trạng thái đơn hàng:</strong></label>
 
     <select name="status" id="status" class="form-select" style="max-width: 300px;">

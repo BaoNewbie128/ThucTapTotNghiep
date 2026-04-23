@@ -1,6 +1,11 @@
 <?php 
 include __DIR__ . "/../includes/auth_check.php";
     include __DIR__ . "/../config/db.php";
+    if(isset($_GET['view']) &&  $_GET['view'] === "edit_order_status"
+    && $_SERVER['REQUEST_METHOD']=== 'POST'){
+        include __DIR__ . "/edit_order_status.php";
+        exit;
+    }
     if(isset($_GET['view']) && $_GET['view'] === 'edit' && $_SERVER['REQUEST_METHOD'] === 'POST'){
     include __DIR__ . "/edit_product.php";
     exit;
@@ -41,12 +46,8 @@ include __DIR__ . "/../includes/auth_check.php";
         }
         $low_stock_result->free();
     }
-
     // $conn->close();
 ?>
-
-
-
 <!DOCTYPE html>
 <html lang="vi">
 

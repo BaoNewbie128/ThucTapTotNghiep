@@ -6,7 +6,7 @@
         exit;
     }
     $user_id = $_SESSION["user_id"];
-     $sql = "SELECT id,total,status,created_at FROM orders WHERE user_id = $user_id AND status IN ('pending','paid','shipping') ORDER BY id DESC";
+     $sql = "SELECT id,total,status,created_at FROM orders WHERE user_id = $user_id AND status  ORDER BY id DESC";
     $orders=$conn->query($sql);
     $orderlist = [];
     if($orders && $orders->num_rows >0){
@@ -23,6 +23,11 @@
     if(isset($_GET['action'])  && isset($_GET['id'])){
         $action = $_GET['action'];
         $order_id = intval($_GET['id']);
+        if($action == 'pending_payment'){
+            $sql = "UPDATE orders SET status = 'pending_payment' WHERE id = $order_id";
+            $conn->query($sql);
+            $_SESSION['message'] = "Đã gửi yêu cầu thanh toán,vui lòng chờ xác nhận từ hệ thống.";
+        }
         if($action == 'delete_all'){
             // LUÔN cộng lại stock dù action là gì để tránh lỗi stock khi hủy đơn hàng hoặc hủy sau khi đã thanh toán
             $isItemReturn_query = $conn->query("SELECT product_id,quantity FROM order_items WHERE order_id = $order_id");
@@ -40,24 +45,6 @@
                 $_SESSION['message'] = "Lỗi khi hủy đơn hàng" . $conn->error;
             }
         }
-        if($action == 'paid'){
-    $sql_paid = "UPDATE orders SET status = 'paid' WHERE id = $order_id";
-    if($conn->query($sql_paid) === true){
-        // Trừ stock
-        $items_query = $conn->query("SELECT product_id, quantity FROM order_items WHERE order_id = $order_id");
-        if($items_query->num_rows > 0){
-            while($item = $items_query->fetch_assoc()){
-                $product_id = $item['product_id'];
-                $quantity = $item['quantity'];
-                $conn->query("UPDATE products SET stock = stock - $quantity WHERE id = $product_id");
-            }
-        }
-        $_SESSION['message'] = "Thanh toán thành công!";
-        $_SESSION['show_thank_you'] = true;
-    } else {
-        $_SESSION['message'] = "Lỗi khi cập nhật thanh toán.";
-    }
-}
      header("Location: order_items.php");
     exit; 
     } 
@@ -103,15 +90,15 @@
                     'paid' => 'Đã thanh toán',
                     'shipping' => 'Đang giao hàng',
                     'completed' => 'Hoàn thành',
-                    'cancelled' => 'Đã hủy'
+                    'cancelled' => 'Đã hủy',
+                    'pending_payment' => 'Chờ thanh toán'
                 ];
         ?>
 
         <div class="card mb-4 shadow-sm">
 
             <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
-                <h6 class="mb-0">Đơn hàng #<?= $order['id'] ?> | <?= $order['created_at'] ?> | <span
-                        class="badge bg-info"><?= $statusTrans[$order['status']] ?? 'Không xác định' ?></span></h6>
+                <h6 class="mb-0">Đơn hàng #<?= $order['id'] ?></h6>
             </div>
             <div class="card-body p-0">
                 <!-- Desktop Table View -->
@@ -209,7 +196,7 @@
                 </div>
             </div>
             <div class="card-footer bg-light">
-                <?php if(! in_array($order['status'],['paid', 'shipping', 'completed'])):?>
+                <?php if(! in_array($order['status'],['paid', 'shipping', 'completed','cancelled'])):?>
                 <a href="order_items.php?action=delete_all&id=<?= $order['id'] ?>" class="btn btn-danger btn-sm w-20"
                     onclick="return confirm('Bạn muốn hủy đơn hàng này?');">
                     Hủy đơn hàng
@@ -223,27 +210,32 @@
                 <p class="fw-bold d-inline-block m-0">Trạng thái đơn hàng : </p>
                 <p class="text-success fw-bold d-inline-block m-0">
                     Đã thanh toán</p>
+                <?php elseif($order['status'] === 'pending_payment'): ?>
+                <p class="fw-bold d-inline-block m-0">Trạng thái đơn hàng : </p>
+                <p class="text-warning fw-bold m-0">Đang chờ admin xác nhận thanh toán</p>
                 <?php elseif($order['status'] === 'shipping'): ?>
                 <p class="fw-bold d-inline-block m-0">Trạng thái đơn hàng : </p>
                 <p class="text-success fw-bold d-inline-block m-0">Đang giao hàng </p>
                 <?php elseif($order['status'] === 'completed'): ?>
                 <p class="fw-bold d-inline-block m-0">Trạng thái đơn hàng : </p>
                 <p class="text-success fw-bold d-inline-block m-0">Đã nhận hàng </p>
+                <?php elseif($order['status'] === 'cancelled'): ?>
+                <p class="fw-bold d-inline-block m-0">Trạng thái đơn hàng : </p>
+                <p class="text-danger fw-bold d-inline-block m-0">Đã hủy </p>
                 <?php endif; ?>
                 <!-- Toggle QR -->
 
                 <div id="qr_box_<?= $order['id'] ?>" class="mt-3 p-3 bg-white border rounded d-none">
                     <h6>Quét mã để thanh toán</h6>
                     <p>Số tiền: <strong class="text-danger"><?= number_format($total) ?>₫</strong></p>
-
+                    <p>Vui lòng nhập nội dung chuyển khoản như sau: MA DON HANG <?=$order['id']  ?> </p>
                     <img src="../images/qr_thanhtoan.jpg" width="250" class="border rounded">
-
                     <div class="mt-3">
-                        <button class="btn btn-primary btn-sm" onclick="confirmPayment(
-                        <?= $order['id'] ?>
-                        )">
-                            Tôi đã thanh toán
-                        </button>
+                        <a href="order_items.php?action=pending_payment&id=<?= $order['id'] ?>"
+                            class="btn btn-primary btn-sm"
+                            onclick="return confirm('Bạn đã chuyển khoản? Chờ admin xác nhận nhé!')">
+                            Tôi đã chuyển khoản
+                        </a>
                         <button class="btn btn-secondary btn-sm" onclick="toggleQR(<?= $order['id'] ?>)">
                             Đóng
                         </button>
@@ -261,13 +253,6 @@
     function toggleQR(orderId, total = 0) {
         const box = document.getElementById("qr_box_" + orderId);
         box.classList.toggle("d-none");
-    }
-    // Gửi AJAX cập nhật trạng thái -> paid
-    function confirmPayment(orderId) {
-        if (!confirm("Xác nhận bạn đã thanh toán đơn hàng này?")) return;
-
-        fetch("order_items.php?action=paid&id=" + orderId)
-            .then(res => window.location.reload());
     }
     </script>
 
