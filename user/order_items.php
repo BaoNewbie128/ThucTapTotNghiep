@@ -6,7 +6,7 @@
         exit;
     }
     $user_id = $_SESSION["user_id"];
-     $sql = "SELECT id,total,status,created_at FROM orders WHERE user_id = $user_id AND status  ORDER BY id DESC";
+     $sql = "SELECT id,total,status,created_at FROM orders WHERE user_id = $user_id AND status ORDER BY id DESC";
     $orders=$conn->query($sql);
     $orderlist = [];
     if($orders && $orders->num_rows >0){
