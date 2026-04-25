@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/admin_auth_check.php';
     require __DIR__ . "/../config/db.php";
     $products = [];
     $unique_brands = [];
@@ -24,14 +25,40 @@ if ($brand_result && $brand_result->num_rows > 0) {
     }
     return $text;
 }
-$search_query = isset($_GET['search']) ? $conn->real_escape_string($_GET['search']) : '';
-    $filter_brand = isset($_GET['brand']) ? $conn->real_escape_string($_GET['brand']) : '';
-    $where_clauses = [];
-    if (!empty($search_query)) {
-        $where_clauses[] = "(brand LIKE '%$search_query%' OR model LIKE '%$search_query%')";
+if (!function_exists('bind_mysqli_params')) {
+    function bind_mysqli_params(mysqli_stmt $stmt, string $types, array $params): void {
+        if ($types === '') {
+            return;
+        }
+        $refs = [];
+        foreach ($params as $key => $value) {
+            $refs[$key] = &$params[$key];
+        }
+        $stmt->bind_param($types, ...$refs);
     }
-    if (!empty($filter_brand) && $filter_brand !== 'all') {
-        $where_clauses[] = "brand = '$filter_brand'";
+}
+$search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
+    $filter_brand = isset($_GET['brand']) ? (array)$_GET['brand'] : [];
+    $filter_brand = array_values(array_filter($filter_brand, fn($brand) => trim($brand) !== ''));
+    $where_clauses = [];
+    $params = [];
+    $types = '';
+    $brand_condition = [];
+    if (!empty($search_query)) {
+        $keyword = '%' . $search_query . '%';
+        $where_clauses[] = "(brand LIKE ? OR model LIKE ?)";
+        array_push($params, $keyword, $keyword);
+        $types .= 'ss';
+    }
+    if (!empty($filter_brand)) {
+        foreach($filter_brand as $b){
+            $brand_condition[] = "brand = ?";
+            $params[] = trim($b);
+            $types .= 's';
+        }if(! empty($brand_condition)){
+             $where_clauses[] = '(' . implode(' OR ' ,$brand_condition) . ')';
+        }
+       
     }
 
     $where_sql = count($where_clauses) > 0 ? ' WHERE ' . implode(' AND ', $where_clauses) : '';
@@ -43,23 +70,25 @@ $offset = ($page -1) * $limit;
 $count_sql = "SELECT COUNT(*) as total FROM (
     SELECT id 
     FROM products 
-    {$where_sql}
-    GROUP BY brand,model,scale,description) AS temp";
-    $count_result = $conn->query($count_sql);
+    {$where_sql} ) AS temp";
+    $count_stmt = $conn->prepare($count_sql);
+    bind_mysqli_params($count_stmt, $types, $params);
+    $count_stmt->execute();
+    $count_result = $count_stmt->get_result();
     $total_products = $count_result->fetch_assoc()['total'] ?? 0;
     $total_pages = ceil($total_products / $limit);
     
-    $sql = "SELECT id, brand, model, scale, price, stock, color, image, description FROM products " . $where_sql . "ORDER BY id DESC LIMIT $limit OFFSET $offset";
-$result = $conn->query($sql);
+    $sql = "SELECT id, brand, model, scale, price, stock, color, image, description FROM products " . $where_sql . " ORDER BY id DESC LIMIT $limit OFFSET $offset";
+$stmt = $conn->prepare($sql);
+bind_mysqli_params($stmt, $types, $params);
+$stmt->execute();
+$result = $stmt->get_result();
 if ($result === FALSE) {
     $error_message = '<div class="alert alert-danger text-center">Lỗi truy vấn: ' . $conn->error . '</div>';
 } else {
     if ($result->num_rows > 0) {
         while($row = $result->fetch_assoc()) {
             $products[] = $row;
-            // if (!in_array($row['brand'], $unique_brands)) {
-            //     $unique_brands[] = $row['brand'];
-            // }
         }
     }
     $result->free();
@@ -70,20 +99,19 @@ $conn->close();
 <a href="admin_dashboard.php?view=add" class="btn btn-success mb-3" style="flex: 0 0 auto;">Thêm 1 sản phẩm</a>
 <form method="GET" class="d-flex gap-2 mb-4" style="flex-wrap: wrap;">
     <input type="hidden" name="view" value="products">
-
-    <select name="brand" class="form-select" style="max-width:200px; flex: 1 1 auto; min-width: 120px;">
-        <option value="all">Tất cả</option>
-        <?php foreach ($unique_brands as $b): ?>
-        <option value="<?= $b ?>" <?= ($filter_brand==$b?"selected":"") ?>><?= $b ?></option>
-        <?php endforeach; ?>
-    </select>
-
-    <input name="search" class="form-control" placeholder="Tìm tên xe/hãng/màu"
-        value="<?= htmlspecialchars($search_query) ?>" style="flex: 1 1 auto; min-width: 150px;">
-
-    <button class="btn btn-primary" style="flex: 0 0 auto;">Lọc</button>
-
+    <?php foreach ($unique_brands as $b): ?>
+    <div class="form-check">
+        <input type="checkbox" name="brand[]" value="<?= $b ?>" onchange="this.form.submit()"
+            <?= (in_array($b, $filter_brand)) ? 'checked' : '' ?>>
+        <label><?= $b ?></label>
+    </div>
+    <?php endforeach; ?>
+    <input name="search" class="form-control mt-2" placeholder="Tìm..." value="<?= htmlspecialchars($search_query) ?>"
+        onchange="this.form.submit()">
 </form>
+<a href="admin_dashboard.php?view=products" class="btn btn-danger mb-3">
+    Xóa bộ lọc
+</a>
 <div class="row g-3">
     <?php foreach ($products as $p):
         $modal_id = 'modal-' . $p['id'];
@@ -118,9 +146,12 @@ $conn->close();
                 <div class="d-flex gap-2">
                     <a href="admin_dashboard.php?view=edit&id=<?= $p['id'] ?>"
                         class="btn btn-sm btn-warning flex-grow-1">Sửa</a>
-                    <a href="admin_dashboard.php?view=delete&id=<?= $p['id'] ?>"
-                        class="btn btn-sm btn-danger flex-grow-1"
-                        onclick="return confirm('Bạn có chắc chắn muốn xóa sản phẩm này?');">Xóa</a>
+                    <form method="POST" action="admin_dashboard.php?view=delete" class="flex-grow-1"
+                        onsubmit="return confirm('Bạn có chắc chắn muốn xóa sản phẩm này?');">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="id" value="<?= $p['id'] ?>">
+                        <button type="submit" class="btn btn-sm btn-danger w-100">Xóa</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -147,30 +178,40 @@ $conn->close();
     <?php if ($total_pages > 1): ?>
     <nav class="mt-4">
         <ul class="pagination justify-content-center">
+            <?php
+            $brand_query = '';
+            if (!empty($filter_brand)) {
+                foreach ($filter_brand as $b) {
+                    $brand_query .= '&brand[]=' . urlencode($b);
+                }
+            }
+            $base_url = "?view=products&search=" . urlencode($search_query) . $brand_query;
+            ?>
 
-            <!-- Nút trang trước -->
             <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
-                <a class="page-link"
-                    href="?view=products&search=<?= urlencode($search_query) ?>&brand=<?= urlencode($filter_brand) ?>&page=<?= $page-1 ?>">
-                    &laquo;
-                </a>
+                <a class="page-link" href="<?= $base_url ?>&page=1">
+                    << </a>
+            </li>
+
+            <li class="page-item <?= ($page <= 1) ? 'disabled' : '' ?>">
+                <a class="page-link" href="<?= $base_url ?>&page=<?= $page-1 ?>">
+                    < </a>
             </li>
 
             <?php for ($i = 1; $i <= $total_pages; $i++): ?>
             <li class="page-item <?= ($i == $page) ? 'active' : '' ?>">
-                <a class="page-link"
-                    href="?view=products&search=<?= urlencode($search_query) ?>&brand=<?= urlencode($filter_brand) ?>&page=<?= $i ?>">
+                <a class="page-link" href="<?= $base_url ?>&page=<?= $i ?>">
                     <?= $i ?>
                 </a>
             </li>
             <?php endfor; ?>
 
-            <!-- Nút trang sau -->
             <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
-                <a class="page-link"
-                    href="?view=products&search=<?= urlencode($search_query) ?>&brand=<?= urlencode($filter_brand) ?>&page=<?= $page+1 ?>">
-                    &raquo;
-                </a>
+                <a class="page-link" href="<?= $base_url ?>&page=<?= $page+1 ?>">></a>
+            </li>
+
+            <li class="page-item <?= ($page >= $total_pages) ? 'disabled' : '' ?>">
+                <a class="page-link" href="<?= $base_url ?>&page=<?= $total_pages ?>">>></a>
             </li>
 
         </ul>

@@ -1,28 +1,34 @@
 <?php
+    require_once __DIR__ . "/../includes/admin_auth_check.php";
     include __DIR__ . "/../config/db.php";
     $success = "";
     $error = "";
     if($_SERVER['REQUEST_METHOD'] === 'POST'){
-        $brand = $conn->real_escape_string($_POST['brand']);
-        $model = $conn->real_escape_string($_POST['model']);
-        $scale = $conn->real_escape_string($_POST['scale']);
-        $color = $conn->real_escape_string($_POST['color']);
-        $price = floatval($_POST['price']);
-        $stock = $conn->real_escape_string($_POST['stock']);
-        $description = $conn->real_escape_string($_POST['description']);
-        $image_name = "";
-        if(!empty($_FILES['image'])){
-          $image_name = time() . "_" . basename($_FILES['image']['name']);
-          move_uploaded_file($_FILES['image']["tmp_name"], __DIR__ . "/../images/" . $image_name);
-        } 
-        $sql = "INSERT INTO products (brand, model, scale, price, stock, color, description, image) VALUES ('$brand', '$model', '$scale', $price, '$stock', '$color', '$description', '$image_name')";
-          if($conn->query($sql) === TRUE){
-              $success = "Thêm sản phẩm thành công!";
-          } else {
-              $error_message = "Lỗi: " . $sql . "<br>" . $conn->error;
-          }
+        verify_csrf();
+        $brand = trim($_POST['brand'] ?? '');
+        $model = trim($_POST['model'] ?? '');
+        $scale = trim($_POST['scale'] ?? '');
+        $color = trim($_POST['color'] ?? '');
+        $price = filter_var($_POST['price'] ?? null, FILTER_VALIDATE_FLOAT);
+        $stock = filter_var($_POST['stock'] ?? null, FILTER_VALIDATE_INT);
+        $description = trim($_POST['description'] ?? '');
+        if($brand === '' || $model === '' || $scale === '' || $color === '' || $description === '' || $price === false || $price < 0 || $stock === false || $stock < 0){
+            $error_message = "Dữ liệu sản phẩm không hợp lệ.";
+        } else {
+            try {
+                $image_name = upload_image_file($_FILES['image'] ?? [], __DIR__ . "/../images");
+                $stmt = $conn->prepare("INSERT INTO products (brand, model, scale, price, stock, color, description, image) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->bind_param("sssdisss", $brand, $model, $scale, $price, $stock, $color, $description, $image_name);
+                $stmt->execute();
+                $success = "Thêm sản phẩm thành công!";
+            } catch (Throwable $e) {
+                $error_message = $e->getMessage();
+            }
+        }
+        if(empty($error_message)){
     header("Location: admin_dashboard.php?view=products");
     exit; 
+        }
     }
     
 ?>
@@ -52,6 +58,7 @@
 
         <div class="card p-4 shadow-sm" style="max-width: 700px;">
             <form method="POST" enctype="multipart/form-data">
+                <?= csrf_field() ?>
                 <div class="mb-3">
                     <label class="form-label fw-600">Hãng</label>
                     <input type="text" name="brand" class="form-control" required>

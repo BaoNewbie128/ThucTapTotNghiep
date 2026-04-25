@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/admin_auth_check.php';
 require __DIR__ . "/../config/db.php";
 
 if (!isset($_GET['order_id'])) {
@@ -12,16 +13,20 @@ $sqlOrder = "
         orders.total,
         orders.status,
         orders.created_at,
+        orders.shipping_fee,
         users.username,
         users.phone,
         users.email,
         users.address
     FROM orders
     JOIN users ON orders.user_id = users.id
-    WHERE orders.id = $order_id
+    WHERE orders.id = ?
 ";
 
-$resultOrder = $conn->query($sqlOrder);
+$stmtOrder = $conn->prepare($sqlOrder);
+$stmtOrder->bind_param("i", $order_id);
+$stmtOrder->execute();
+$resultOrder = $stmtOrder->get_result();
 
 if ($resultOrder->num_rows === 0) {
     die("<div class='alert alert-danger text-center'>Không tìm thấy đơn hàng!</div>");
@@ -40,10 +45,13 @@ $sqlItems = "
         products.color
     FROM order_items
     JOIN products ON order_items.product_id = products.id
-    WHERE order_items.order_id = $order_id
+    WHERE order_items.order_id = ?
 ";
 
-$resultItems = $conn->query($sqlItems);
+$stmtItems = $conn->prepare($sqlItems);
+$stmtItems->bind_param("i", $order_id);
+$stmtItems->execute();
+$resultItems = $stmtItems->get_result();
 
 $orderItems = [];
 if ($resultItems->num_rows > 0) {
@@ -56,10 +64,13 @@ if ($resultItems->num_rows > 0) {
                     'paid' => 'Đã thanh toán',
                     'shipping' => 'Đang giao hàng',
                     'completed' => 'Hoàn thành',
-                    'canceled' => 'Đã hủy'
+                    'cancelled' => 'Đã hủy'
                 ];
 $conn->close();
-$total_price = 0;
+$items_total = 0;
+foreach ($orderItems as $item) {
+    $items_total += (float)$item['price'] * (int)$item['quantity'];
+}
 ?>
 <a href="admin_dashboard.php?view=orders" class="btn btn-secondary mt-3 mb-3">Quay lại</a>
 <h2 class="text-primary mb-4">Chi tiết đơn hàng #<?= $order['id'] ?></h2>
@@ -74,6 +85,9 @@ $total_price = 0;
     <hr>
 
     <h4>Thông tin đơn hàng</h4>
+    <p><strong>Tổng tiền sản phẩm:</strong> <?= number_format($order['total'] - $order['shipping_fee'], 0, ',', '.') ?>₫
+    </p>
+    <p><strong>Phí ship:</strong> <?= number_format($order['shipping_fee'], 0, ',', '.') ?>₫</p>
     <p><strong>Tổng tiền:</strong> <?= number_format($order['total'], 0, ',', '.') ?>₫</p>
     <p><strong>Trạng thái:</strong> <?= $statusTrans[$order['status']] ?? 'Không xác định' ?> <a
             href="admin_dashboard.php?view=edit_order_status&order_id=<?= $order['id'] ?>"
@@ -102,8 +116,7 @@ $total_price = 0;
             </tr>
         </thead>
         <tbody>
-            <?php foreach ($orderItems as $item): 
-                        $total_price += $item['price'] * $item['quantity']; ?>
+            <?php foreach ($orderItems as $item): ?>
             <tr>
                 <td>
                     <img src="../images/<?= $item['image'] ?>" width="100px" style="object-fit: cover; height: 100px;">
@@ -119,7 +132,7 @@ $total_price = 0;
             <tr class="table-active">
                 <td colspan="7">
                     <h5 class="text-end mb-0">Tổng cộng: <strong
-                            class="text-danger"><?= number_format($total_price) ?>₫</strong></h5>
+                            class="text-danger"><?= number_format($items_total, 0, ',', '.') ?>₫</strong></h5>
                 </td>
             </tr>
         </tbody>
@@ -129,8 +142,7 @@ $total_price = 0;
 <!-- Mobile Card View -->
 <div class="d-md-none">
     <div class="row g-3">
-        <?php foreach ($orderItems as $item): 
-                    $total_price += $item['price'] * $item['quantity']; ?>
+        <?php foreach ($orderItems as $item): ?>
         <div class="col-12">
             <div class="card shadow-sm">
                 <div class="row g-0">
@@ -164,7 +176,8 @@ $total_price = 0;
     </div>
 
     <div class="card mt-3 p-3 text-center border-danger" style="background: rgba(255, 71, 87, 0.05);">
-        <h5 class="mb-0">Tổng cộng: <strong class="text-danger"><?= number_format($total_price) ?>₫</strong></h5>
+        <h5 class="mb-0">Tổng cộng: <strong
+                class="text-danger"><?= number_format($items_total, 0, ',', '.') ?>₫</strong></h5>
     </div>
 </div>
 

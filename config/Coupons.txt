@@ -1,0 +1,14 @@
+CREATE TABLE coupons (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(50) UNIQUE,
+    discount INT NOT NULL,
+    type ENUM('fixed','percent') DEFAULT 'fixed',
+    expiry_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+INSERT INTO coupons (code, discount, type, expiry_date)
+VALUES 
+('GIAM50K', 50000, 'fixed', '2026-12-31'),
+('SALE10', 10, 'percent', '2026-12-31');
+
+ALTER TABLE orders ADD discount INT DEFAULT 0;

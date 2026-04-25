@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/admin_auth_check.php';
 
 include __DIR__ ."/../includes/auth_check.php";
 require_once __DIR__ . "/../config/db.php";
@@ -14,7 +15,9 @@ $count_sql = "SELECT COUNT(*) as total FROM (
     FROM reviews r JOIN users u ON r.user_id = u.id
     JOIN products p ON r.product_id = p.id 
     GROUP BY r.id) AS temp";
-    $count_result = $conn->query($count_sql);
+    $count_stmt = $conn->prepare($count_sql);
+    $count_stmt->execute();
+    $count_result = $count_stmt->get_result();
     $total_products = $count_result->fetch_assoc()['total'] ?? 0;
     $total_pages = ceil($total_products / $limit);
     // read
@@ -22,19 +25,25 @@ $count_sql = "SELECT COUNT(*) as total FROM (
                     FROM reviews r 
                     JOIN users u ON r.user_id = u.id 
                     JOIN products p ON r.product_id = p.id
-                    ORDER BY r.created_at DESC";
-    $reviews = $conn->query($sql);
+                    ORDER BY r.created_at DESC
+                    LIMIT ? OFFSET ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("ii", $limit, $offset);
+    $stmt->execute();
+    $reviews = $stmt->get_result();
 
       // edit
     if(isset($_POST['edit_review_id'])){
+        verify_csrf();
         $review_id = intval($_POST['edit_review_id']);
-        $comment = $conn->real_escape_string($_POST['edit_comment']);
+        $comment = trim($_POST['edit_comment'] ?? '');
         $rating = intval($_POST['edit_rating'] ?? 10);
         if($rating < 1 || $rating > 10){
           $rating = 10;
         }
-        $sql_edit = "UPDATE reviews SET comment='$comment', rating=$rating WHERE id = $review_id";
-        if($conn->query($sql_edit) === TRUE){
+        $stmt = $conn->prepare("UPDATE reviews SET comment = ?, rating = ? WHERE id = ?");
+        $stmt->bind_param("sii", $comment, $rating, $review_id);
+        if($stmt->execute()){
             $message = "<div class='alert alert-success text-center'>Đánh giá đã được cập nhật !</div>";
              header("Location: ?view=reviews&page=$page");
              exit();
@@ -43,9 +52,12 @@ $count_sql = "SELECT COUNT(*) as total FROM (
         }
     }
       // delete
-    if(isset($_GET['delete_review'])){
-        $review_id = intval($_GET['delete_review']);
-           if( $conn->query("DELETE FROM reviews WHERE id = $review_id")){
+    if(isset($_POST['delete_review'])){
+        verify_csrf();
+        $review_id = intval($_POST['delete_review']);
+        $stmt = $conn->prepare("DELETE FROM reviews WHERE id = ?");
+        $stmt->bind_param("i", $review_id);
+           if($stmt->execute()){
             $message = "<div class='alert alert-success text-center'>Đánh giá đã được xóa !</div>";
             header("Location: ?view=reviews&page=$page");
         exit();
@@ -93,10 +105,12 @@ $conn->close();
                         <button class="btn btn-warning btn-sm"
                             onclick="openEditModal(<?= $r['review_id'] ?>, <?= $r['rating'] ?>, `<?= htmlspecialchars($r['comment'], ENT_QUOTES) ?>`)">
                             Sửa</button>
-                        <a href="?view=reviews&delete_review=<?= $r['review_id'] ?>&page=<?= $page ?>"
-                            onclick="return confirm('Xóa đánh giá này?')" class="btn btn-danger btn-sm">
-                            Xóa
-                        </a>
+                        <form method="POST" action="?view=reviews&page=<?= $page ?>" class="d-inline"
+                            onsubmit="return confirm('Xóa đánh giá này?');">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="delete_review" value="<?= $r['review_id'] ?>">
+                            <button type="submit" class="btn btn-danger btn-sm">Xóa</button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -143,6 +157,7 @@ $conn->close();
             <div class="modal-content">
 
                 <form method="POST">
+                    <?= csrf_field() ?>
 
                     <div class="modal-header">
                         <h5 class="modal-title">Sửa đánh giá</h5>

@@ -1,56 +1,91 @@
 <?php
-    session_start();
-    require_once __DIR__ . "/../config/db.php";
-    if(!isset($_SESSION["user_id"])){
-        header("Location: ../login.php");
+session_start();
+require_once __DIR__ . "/../config/db.php";
+require_once __DIR__ . "/../includes/security.php";
+
+if (!isset($_SESSION["user_id"])) {
+    header("Location: ../login.php");
+    exit;
+}
+
+$user_id = intval($_SESSION["user_id"]);
+if (isset($_POST["action"]) && $_POST["action"] === "checkout") {
+    verify_csrf();
+    $conn->begin_transaction();
+    try {
+        $stmt = $conn->prepare("SELECT id FROM cart WHERE user_id = ? FOR UPDATE");
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+        $cart = $stmt->get_result()->fetch_assoc();
+        if (!$cart) {
+            throw new Exception("Giỏ hàng trống!");
+        }
+        $cart_id = intval($cart["id"]);
+
+        $stmt = $conn->prepare("SELECT ci.product_id, ci.quantity, p.stock, p.price
+                                FROM cart_items ci
+                                JOIN products p ON ci.product_id = p.id
+                                WHERE ci.cart_id = ? FOR UPDATE");
+        $stmt->bind_param("i", $cart_id);
+        $stmt->execute();
+        $items_result = $stmt->get_result();
+
+        $items = [];
+        $total_amount = 0;
+        while ($item = $items_result->fetch_assoc()) {
+            $pid = intval($item['product_id']);
+            $qty = intval($item['quantity']);
+            $stock = intval($item['stock']);
+            $price = (float)$item['price'];
+            if ($qty <= 0 || $stock < $qty) {
+                throw new Exception("Sản phẩm ID $pid không đủ tồn kho để đặt hàng!");
+            }
+            $items[] = ['product_id' => $pid, 'quantity' => $qty, 'price' => $price];
+            $total_amount += $qty * $price;
+        }
+        if (!$items) {
+            throw new Exception("Giỏ hàng trống!");
+        }
+
+        $shipping_fee = 30000;
+        $discount_amount = min($total_amount, (float)($_SESSION['coupon']['discount'] ?? 0));
+        $total_with_shipping = max(0, $total_amount + $shipping_fee - $discount_amount);
+
+        $stmt = $conn->prepare("INSERT INTO orders (user_id, status, total, shipping_fee, discount) VALUES (?, 'pending', ?, ?, ?)");
+        $stmt->bind_param("iddd", $user_id, $total_with_shipping, $shipping_fee, $discount_amount);
+        $stmt->execute();
+        $order_id = $conn->insert_id;
+
+        $stmt_item = $conn->prepare("INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)");
+        $stmt_stock = $conn->prepare("UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?");
+        foreach ($items as $item) {
+            $stmt_item->bind_param("iiid", $order_id, $item['product_id'], $item['quantity'], $item['price']);
+            $stmt_item->execute();
+            $stmt_stock->bind_param("iii", $item['quantity'], $item['product_id'], $item['quantity']);
+            $stmt_stock->execute();
+            if ($stmt_stock->affected_rows !== 1) {
+                throw new Exception("Không thể trừ tồn kho sản phẩm ID {$item['product_id']}.");
+            }
+        }
+
+        $stmt = $conn->prepare("DELETE FROM cart_items WHERE cart_id = ?");
+        $stmt->bind_param("i", $cart_id);
+        $stmt->execute();
+        $stmt = $conn->prepare("DELETE FROM cart WHERE id = ? AND user_id = ?");
+        $stmt->bind_param("ii", $cart_id, $user_id);
+        $stmt->execute();
+        unset($_SESSION['coupon']);
+        $conn->commit();
+        header("Location: order_items.php");
+        exit;
+    } catch (Throwable $e) {
+        $conn->rollback();
+        $_SESSION['message'] = $e->getMessage();
+        header("Location: cart_item.php");
         exit;
     }
-    $user_id = $_SESSION["user_id"];
-    if (isset($_GET["action"]) && $_GET["action"] == "checkout") {
-        $conn->begin_transaction();
-        try{
-        $sql = "SELECT id FROM cart WHERE user_id = $user_id FOR UPDATE";
-        $result = $conn->query($sql);
-             if ($result->num_rows == 0) {
-                die("Giỏ hàng trống!");
-            }
-            $cart_id = $result->fetch_assoc()["id"];
-            $items = $conn->query("SELECT ci.product_id, ci.quantity, p.stock ,p.price  
-            FROM cart_items ci JOIN products p ON ci.product_id =p.id WHERE ci.cart_id = $cart_id 
-            FOR UPDATE");
-             $total_amount = 0;
-            while ($item = $items->fetch_assoc()){
-                $pid = $item['product_id'];
-                $qty = $item['quantity'];
-                $stock = $item['stock'];
-                $price = $item['price'];
-                if ($stock < $qty) {
-                    throw new Exception("Sản phẩm ID $pid đã hết hàng, không thể đặt hàng!");
-                }
-                 $total_amount += $qty * $price;
-
-            }
-            $conn->query("INSERT INTO orders (user_id, status,total) VALUES ($user_id, 'pending', $total_amount)");
-                $order_id = $conn->insert_id;
-             $items = $conn->query("SELECT product_id, quantity FROM cart_items WHERE cart_id = $cart_id");
-              while ($item = $items->fetch_assoc()) {
-                $pid = $item['product_id'];
-                $qty = $item['quantity'];
-                $priceQuery = $conn->query("SELECT price FROM products WHERE id = $pid");
-                $price = $priceQuery->fetch_assoc()["price"];
-                 $conn->query("INSERT INTO order_items (order_id, product_id, quantity, price)
-                          VALUES ($order_id, $pid, $qty, $price)");
-            $conn->query("UPDATE products SET stock = stock - $qty WHERE id = $pid");
-              }
-              $conn->query("DELETE FROM cart_items WHERE cart_id = $cart_id");
-                $conn->query("DELETE FROM cart WHERE id = $cart_id");
-                $conn->commit();
-                 header("Location: order_items.php");
-                 exit;
-        } catch (Exception $e) {
-        $conn->rollback();
-
-        echo "<div class='alert alert-danger text-center'>" . $e->getMessage() . "</div>";
-    }
 }
+
+header("Location: cart_item.php");
+exit;
 ?>

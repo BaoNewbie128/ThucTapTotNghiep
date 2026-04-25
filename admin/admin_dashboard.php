@@ -1,13 +1,37 @@
+<?php ob_start(); ?>
 <?php 
-include __DIR__ . "/../includes/auth_check.php";
+include __DIR__ . "/../includes/admin_auth_check.php";
     include __DIR__ . "/../config/db.php";
+    if (isset($_GET["view"]) && $_GET["view"] === "add-post" 
+    && $_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    include __DIR__ . "/add_post.php";
+    exit;
+    }
+    if (isset($_GET["view"]) && $_GET["view"] === "edit-post" 
+    && $_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    include __DIR__ . "/edit_post.php";
+    exit;
+    }
+    if($_SERVER['REQUEST_METHOD'] === 'POST'){
+        if (isset($_GET["view"]) && $_GET["view"] === "delete-post") {
+
+    include __DIR__ . "/delete_post.php";
+    exit;
+        }
+    }
     if(isset($_GET['view']) &&  $_GET['view'] === "edit_order_status"
     && $_SERVER['REQUEST_METHOD']=== 'POST'){
-        include __DIR__ . "/edit_order_status.php";
+        include __DIR__ . "/update_order_status.php";
         exit;
     }
     if(isset($_GET['view']) && $_GET['view'] === 'edit' && $_SERVER['REQUEST_METHOD'] === 'POST'){
     include __DIR__ . "/edit_product.php";
+    exit;
+    }
+    if (isset($_GET["view"]) && $_GET["view"] === "delete" && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    include __DIR__ . "/delete_product.php";
     exit;
 }
     // Truy vấn tổng số lượng sản phẩm 
@@ -89,6 +113,9 @@ include __DIR__ . "/../includes/auth_check.php";
                             <img src="../images/report.png" alt="báo cáo" class="profile-img"> Báo cáo thống kê</a>
                         <a class="nav-link nav-btn" href="admin_dashboard.php?view=users">
                             <img src="../images/admin.png" alt="người dùng" class="profile-img"> Quản lý người dùng</a>
+                        <a class="nav-link nav-btn" href="admin_dashboard.php?view=posts">
+                            📰 Quản lý bài viết
+                        </a>
                     </nav>
                 </aside>
             </div>
@@ -104,7 +131,7 @@ include __DIR__ . "/../includes/auth_check.php";
                     }elseif(isset($_GET["view"]) && $_GET["view"] === "edit") {
                         include __DIR__ . "/edit_product.php";
                     }elseif(isset($_GET["view"]) && $_GET["view"] === "delete") {
-                        include __DIR__ . "/delete_product.php";
+                        echo "<div class='alert alert-danger'>Thao tác xóa chỉ được thực hiện bằng POST.</div>";
                     }elseif(isset($_GET["view"]) && $_GET["view"] === "orders") {
                         include __DIR__ . "/order_management.php";
                     }elseif(isset($_GET["view"]) && $_GET["view"] === "order_items") {
@@ -133,6 +160,15 @@ include __DIR__ . "/../includes/auth_check.php";
                     }
                     elseif(isset($_GET["view"]) && $_GET["view"] === "reports") {
                         include __DIR__ . "/reports.php";
+                    }
+                    elseif(isset($_GET["view"]) && $_GET["view"] === "posts") {
+                        include __DIR__ . "/post_management.php";
+                    }
+                    elseif(isset($_GET["view"]) && $_GET["view"] === "add-post") {
+                        include __DIR__ . "/add_post_form.php";
+                    }
+                    elseif(isset($_GET["view"]) && $_GET["view"] === "edit-post") {
+                        include __DIR__ . "/edit_post.php";
                     }
                     else {
                 ?>
@@ -216,3 +252,4 @@ include __DIR__ . "/../includes/auth_check.php";
 </body>
 
 </html>
+<?php ob_end_flush(); ?>

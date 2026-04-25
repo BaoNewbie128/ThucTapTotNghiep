@@ -1,12 +1,18 @@
 <?php
+require_once __DIR__ . '/../includes/admin_auth_check.php';
     require __DIR__ . "/../config/db.php";
     $customers = [];
     $error_message ="";
 
-    $search_query = isset($_GET['search']) ? $conn->real_escape_string($_GET['search']) : '';
+    $search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
     $where_clauses = [];
+    $params = [];
+    $types = '';
     if (!empty($search_query)) {
-        $where_clauses[] = "(username LIKE '%$search_query%' OR email LIKE '%$search_query%')";
+        $keyword = '%' . $search_query . '%';
+        $where_clauses[] = "(username LIKE ? OR email LIKE ?)";
+        array_push($params, $keyword, $keyword);
+        $types .= 'ss';
     }
 
     $where_sql = " WHERE role ='customer'";
@@ -21,11 +27,21 @@ $count_sql = "SELECT COUNT(*) as total FROM (
     FROM users 
     {$where_sql}
     GROUP BY username, email,phone,address, created_at) AS temp";
-    $count_result = $conn->query($count_sql);
+    $count_stmt = $conn->prepare($count_sql);
+    if ($types !== '') {
+        $count_stmt->bind_param($types, ...$params);
+    }
+    $count_stmt->execute();
+    $count_result = $count_stmt->get_result();
     $total_products = $count_result->fetch_assoc()['total'] ?? 0;
     $total_pages = ceil($total_products / $limit);
-    $sql = "SELECT id, username, email,phone,address, created_at FROM users " . $where_sql . " ORDER BY id DESC";
-$result = $conn->query($sql);
+    $sql = "SELECT id, username, email,phone,address, created_at FROM users " . $where_sql . " ORDER BY id DESC LIMIT $limit OFFSET $offset";
+$stmt = $conn->prepare($sql);
+if ($types !== '') {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$result = $stmt->get_result();
 if ($result === FALSE) {
     $error_message = '<div class="alert alert-danger text-center">Lỗi truy vấn: ' . $conn->error . '</div>';
 } else {

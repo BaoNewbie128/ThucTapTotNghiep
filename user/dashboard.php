@@ -29,25 +29,43 @@ function truncate_description($text, $limit = 100) {
     return $text;
 }
 
-$search_query = isset($_GET['search']) ? $conn->real_escape_string(trim($_GET['search'])) : '';
-$filter_brand = isset($_GET['brand']) ? $conn->real_escape_string(trim($_GET['brand'])) : '';
+if (!function_exists('bind_mysqli_params')) {
+    function bind_mysqli_params(mysqli_stmt $stmt, string $types, array $params): void {
+        if ($types === '') {
+            return;
+        }
+        $refs = [];
+        foreach ($params as $key => $value) {
+            $refs[$key] = &$params[$key];
+        }
+        $stmt->bind_param($types, ...$refs);
+    }
+}
+
+$search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
+$filter_brand = isset($_GET['brand']) ? trim($_GET['brand']) : '';
 
 $where_clauses = [];
+$params = [];
+$types = '';
 if ($search_query !== '') {
     // Tìm theo brand, model, description, image, color
-    $s = $conn->real_escape_string($search_query);
+    $s = '%' . $search_query . '%';
     $where_clauses[] = "(
-        brand LIKE '%$s%'
-        OR model LIKE '%$s%'
-        OR description LIKE '%$s%'
-        OR image LIKE '%$s%'
-        OR color LIKE '%$s%'
-        OR price = '$s'
+        brand LIKE ?
+        OR model LIKE ?
+        OR description LIKE ?
+        OR image LIKE ?
+        OR color LIKE ?
+        OR price = ?
     )";
+    array_push($params, $s, $s, $s, $s, $s, $search_query);
+    $types .= 'ssssss';
 }
 if ($filter_brand !== '' && $filter_brand !== 'all') {
-    $b = $conn->real_escape_string($filter_brand);
-    $where_clauses[] = "brand = '$b'";
+    $where_clauses[] = "brand = ?";
+    $params[] = $filter_brand;
+    $types .= 's';
 }
 
 $where_sql = count($where_clauses) ? 'WHERE ' . implode(' AND ', $where_clauses) : '';
@@ -60,7 +78,10 @@ $count_sql = "SELECT COUNT(*) as total FROM (
     FROM products 
     {$where_sql}
     GROUP BY brand,model,scale,description) AS temp";
-    $count_result = $conn->query($count_sql);
+    $count_stmt = $conn->prepare($count_sql);
+    bind_mysqli_params($count_stmt, $types, $params);
+    $count_stmt->execute();
+    $count_result = $count_stmt->get_result();
     $total_products = $count_result->fetch_assoc()['total'] ?? 0;
     $total_pages = ceil($total_products / $limit);
 
@@ -83,7 +104,10 @@ ORDER BY MIN(id) DESC
 LIMIT $limit OFFSET $offset
 ";
 
-$result = $conn->query($sql);
+$stmt = $conn->prepare($sql);
+bind_mysqli_params($stmt, $types, $params);
+$stmt->execute();
+$result = $stmt->get_result();
 
 if ($result === FALSE) {
     $error_message = '<div class="alert alert-danger text-center">Lỗi truy vấn: ' . htmlspecialchars($conn->error) . '</div>';
@@ -229,13 +253,16 @@ if ($result === FALSE) {
                     $short_description = truncate_description($p['description'] ?? '', 20);
 
                     // id dùng cho modal (lấy id đầu tiên nếu có)
-                    $first_id = isset($p['ids_list'][0]) ? $p['ids_list'][0] : '0';
+                    $first_id = isset($p['ids_list'][0]) ? intval($p['ids_list'][0]) : 0;
                     $modal_id = 'modal-' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $first_id);
 
                     // Lấy đánh giá cho sản phẩm
                     $reviews = [];
-                    $sql_reviews = "SELECT r.rating, r.comment, r.created_at, u.username FROM reviews r JOIN users u ON r.user_id = u.id WHERE r.product_id = $first_id ORDER BY r.created_at DESC LIMIT 10";
-                    $review_result = $conn->query($sql_reviews);
+                    $sql_reviews = "SELECT r.rating, r.comment, r.created_at, u.username FROM reviews r JOIN users u ON r.user_id = u.id WHERE r.product_id = ? ORDER BY r.created_at DESC LIMIT 10";
+                    $review_stmt = $conn->prepare($sql_reviews);
+                    $review_stmt->bind_param("i", $first_id);
+                    $review_stmt->execute();
+                    $review_result = $review_stmt->get_result();
                     if ($review_result) {
                         while ($rev = $review_result->fetch_assoc()) {
                             $reviews[] = $rev;
@@ -243,8 +270,11 @@ if ($result === FALSE) {
                         $review_result->free();
                     }
                     $count_reviews = 0;
-                    $sql_count = "SELECT COUNT(*) as total_reviews FROM reviews WHERE product_id = $first_id";
-                    $count_result = $conn->query($sql_count);
+                    $sql_count = "SELECT COUNT(*) as total_reviews FROM reviews WHERE product_id = ?";
+                    $count_stmt = $conn->prepare($sql_count);
+                    $count_stmt->bind_param("i", $first_id);
+                    $count_stmt->execute();
+                    $count_result = $count_stmt->get_result();
                     if ($count_result) {
                         $count_reviews = $count_result->fetch_assoc()['total_reviews'] ?? 0;
                         $count_result->free();

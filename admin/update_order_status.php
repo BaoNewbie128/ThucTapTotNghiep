@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/admin_auth_check.php';
 require __DIR__ . "/../config/db.php";
 
 if(!isset($_GET['order_id'])){
@@ -6,13 +7,19 @@ if(!isset($_GET['order_id'])){
 }
 
 $order_id = intval($_GET['order_id']);
+$statusOptions = ['pending', 'paid', 'shipping', 'completed', 'cancelled', 'pending_payment'];
 
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
-    $status = $conn->real_escape_string($_POST['status']);
+    verify_csrf();
+    $status = $_POST['status'] ?? '';
+    if (!in_array($status, $statusOptions, true)) {
+        die("Trạng thái không hợp lệ.");
+    }
 
-    $sql = "UPDATE orders SET status='$status' WHERE id=$order_id";
+    $stmt = $conn->prepare("UPDATE orders SET status = ? WHERE id = ?");
+    $stmt->bind_param("si", $status, $order_id);
 
-    if($conn->query($sql)){
+    if($stmt->execute()){
         header("Location: admin_dashboard.php?view=orders");
         exit;
     } else {

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/admin_auth_check.php';
     require __DIR__ . "/../config/db.php";
     $users = [];
     $unique_name = [];

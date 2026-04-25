@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/admin_auth_check.php';
 require __DIR__ . "/../config/db.php";
 
 if (!isset($_GET['user_id']) || empty($_GET['user_id'])) {
@@ -29,6 +30,7 @@ function checkRelation($conn, $table, $column, $user_id) {
 $error_message = "";
 // Nếu bấm xác nhận
 if (isset($_POST['confirm_delete'])) {
+    verify_csrf();
     if (checkRelation($conn, "orders", "user_id", $user_id)) {
         $error_message = "Không thể xóa vì người dùng đã đặt hàng (orders).";
     } elseif (checkRelation($conn, "cart", "user_id", $user_id)) {
@@ -62,6 +64,7 @@ if (isset($_POST['confirm_delete'])) {
     </div>
 
     <form method="POST">
+        <?= csrf_field() ?>
         <button type="submit" name="confirm_delete" class="btn btn-danger">Xóa ngay</button>
         <a href="admin_dashboard.php?view=users" class="btn btn-secondary">Hủy</a>
     </form>

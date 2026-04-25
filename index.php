@@ -2,6 +2,7 @@
 ob_start();
 session_start();
 require_once __DIR__ . "/config/db.php";
+require_once __DIR__ . "/includes/security.php";
 
 $products = [];
 $unique_brands = [];
@@ -29,26 +30,45 @@ function truncate_description($text, $limit = 100) {
     return $text;
 }
 
-$search_query = isset($_GET['search']) ? $conn->real_escape_string(trim($_GET['search'])) : '';
+if (!function_exists('bind_mysqli_params')) {
+    function bind_mysqli_params(mysqli_stmt $stmt, string $types, array $params): void {
+        if ($types === '') {
+            return;
+        }
+        $refs = [];
+        foreach ($params as $key => $value) {
+            $refs[$key] = &$params[$key];
+        }
+        $stmt->bind_param($types, ...$refs);
+    }
+}
+
+$search_query = isset($_GET['search']) ? trim($_GET['search']) : '';
 $filter_brand = isset($_GET['brand']) ? (array)$_GET['brand'] : [];
+$filter_brand = array_values(array_filter($filter_brand, fn($brand) => $brand !== '' && $brand !== 'all'));
 
 $where_clauses = [];
+$params = [];
+$types = '';
 if ($search_query !== '') {
     // Tìm theo brand, model, description, image, color
-    $s = $conn->real_escape_string($search_query);
+    $s = '%' . $search_query . '%';
     $where_clauses[] = "(
-        brand LIKE '%$s%'
-        OR model LIKE '%$s%'
-        OR image LIKE '%$s%'
-        OR color LIKE '%$s%'
-        OR price = '$s'
+        brand LIKE ?
+        OR model LIKE ?
+        OR image LIKE ?
+        OR color LIKE ?
+        OR price = ?
     )";
+    array_push($params, $s, $s, $s, $s, $search_query);
+    $types .= 'sssss';
 }
 $brand_condition = [];
 if (!empty($filter_brand) && is_array($filter_brand)) {
     foreach ($filter_brand as $b) {
-        $b = $conn->real_escape_string($b);
-        $brand_condition[] = "brand = '$b'";
+        $brand_condition[] = "brand = ?";
+        $params[] = trim($b);
+        $types .= 's';
     }
     if (!empty($brand_condition)) {
         $where_clauses[] = '(' . implode(' OR ', $brand_condition) . ')';
@@ -65,7 +85,10 @@ $count_sql = "SELECT COUNT(*) as total FROM (
     FROM products 
     {$where_sql}
     GROUP BY brand,model,scale) AS temp";
-    $count_result = $conn->query($count_sql);
+    $count_stmt = $conn->prepare($count_sql);
+    bind_mysqli_params($count_stmt, $types, $params);
+    $count_stmt->execute();
+    $count_result = $count_stmt->get_result();
     $total_products = $count_result->fetch_assoc()['total'] ?? 0;
     $total_pages = ceil($total_products / $limit);
 
@@ -101,7 +124,10 @@ GROUP BY TRIM(LOWER(brand)),
 LIMIT $limit OFFSET $offset
 ";
 
-$result = $conn->query($sql);
+$stmt = $conn->prepare($sql);
+bind_mysqli_params($stmt, $types, $params);
+$stmt->execute();
+$result = $stmt->get_result();
 
 if ($result === FALSE) {
     $error_message = '<div class="alert alert-danger text-center">Lỗi truy vấn: ' . htmlspecialchars($conn->error) . '</div>';
@@ -153,8 +179,7 @@ if ($result === FALSE) {
 <body class="bg-light">
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-2">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" style="color: aqua; font-size: 1.3rem;" href="/index.php">JDM World <img
-                    src="../images/drift-car.png" class="jdm-img" alt="jdm world"></a>
+            <a class="navbar-brand fw-bold" style="color: aqua; font-size: 1.3rem;" href="/index.php">JDM World </a>
             <div class="d-lg-none ms-auto me-2 text-white small">
                 <span><?= htmlspecialchars($_SESSION["username"] ?? '') ?></span>
             </div>
@@ -172,7 +197,7 @@ if ($result === FALSE) {
                         <a class="nav-link dropdown-toggle btn btn-secondary btn-sm text-white" href="#"
                             id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                             Hãng xe:
-                            <?= !empty($filter_brand) ? implode(', ', $filter_brand) : 'Tất cả' ?>
+                            <?= !empty($filter_brand) ? htmlspecialchars(implode(', ', $filter_brand)) : 'Tất cả' ?>
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
                             <li><a class="dropdown-item <?= ($filter_brand == 'all' || $filter_brand == '') ? 'active' : '' ?>"
@@ -200,7 +225,11 @@ if ($result === FALSE) {
 
                 <ul class="navbar-nav ms-lg-auto">
                     <?php if (isset($_SESSION["user_id"])): ?>
-
+                    <li class="nav-item">
+                        <a class="nav-link text-white" href="/index.php?view=blog">
+                            📰 Tin tức
+                        </a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/user/cart_item.php">
                             <img src="../images/cart.png" class="cart-img"> Giỏ hàng
@@ -232,9 +261,18 @@ if ($result === FALSE) {
                     </li>
 
                     <?php else: ?>
-
                     <li class="nav-item">
-                        <a class="nav-link btn btn-warning text-white" href="/login.php">Đăng nhập</a>
+                        <a class="nav-link text-white btn btn-secondary" href="/index.php">
+                            Trang chủ
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white btn btn-primary" href="/index.php?view=blog">
+                            📰 Tin tức
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link text-white btn btn-warning" href="/login.php">Đăng nhập</a>
                     </li>
 
                     <?php endif; ?>
@@ -257,11 +295,12 @@ if ($result === FALSE) {
 
                     <?php foreach ($unique_brands as $brand): ?>
                     <div class="form-check">
-                        <input type="checkbox" name="brand[]" value="<?= $brand ?>" onchange="this.form.submit()"
+                        <input type="checkbox" name="brand[]" value="<?= htmlspecialchars($brand) ?>"
+                            onchange="this.form.submit()"
                             <?= (isset($_GET['brand']) && in_array($brand,(array)$filter_brand)) ? 'checked' : '' ?>>
 
                         <label class="form-check-label">
-                            <?= $brand ?>
+                            <?= htmlspecialchars($brand) ?>
                         </label>
                     </div>
                     <?php endforeach; ?>
@@ -309,12 +348,21 @@ if ($result === FALSE) {
             <div class="app-container">
                 <?php
     if (isset($_GET["view"]) && $_GET["view"] === "profile") {
-        include __DIR__ . "/profile.php";
+        include __DIR__ . "/user/profile.php";
     } elseif (isset($_GET["view"]) && $_GET["view"] === "edit-profile") {
-        include __DIR__ . "/edit_profile.php";
-    } else { ?>
-                <div class="mb-3">
-                    <h2 class="mb-0 fw-bold page-title">Các mô hình xe JDM</h2>
+        include __DIR__ . "/user/edit_profile.php";
+
+    } elseif (isset($_GET["view"]) && $_GET["view"] === "blog") {
+        include __DIR__ . "/user/blog.php";
+    }
+      elseif (isset($_GET["view"]) && $_GET["view"] === "post") {
+        include __DIR__ . "/user/post_detail.php";
+    }    
+    else { ?>
+                <div class="shop-hero mb-4">
+                    <span class="eyebrow">Die-cast garage</span>
+                    <h2 class="mb-1 fw-bold page-title">Các mô hình xe JDM</h2>
+                    <p class="mb-0 text-muted">Lọc nhanh theo hãng, chọn màu xe và đặt hàng an toàn hơn.</p>
                 </div>
 
                 <?= $error_message ?>
@@ -333,13 +381,16 @@ if ($result === FALSE) {
                     $short_description = truncate_description($p['description'] ?? '', 20);
 
                     // id dùng cho modal (lấy id đầu tiên nếu có)
-                    $first_id = isset($p['ids_list'][0]) ? $p['ids_list'][0] : '0';
+                    $first_id = isset($p['ids_list'][0]) ? intval($p['ids_list'][0]) : 0;
                     $modal_id = 'modal-' . preg_replace('/[^a-zA-Z0-9_-]/', '_', $first_id);
 
                     // Lấy đánh giá cho sản phẩm
                     $reviews = [];
-                    $sql_reviews = "SELECT r.rating, r.comment, r.created_at, u.username FROM reviews r JOIN users u ON r.user_id = u.id WHERE r.product_id = $first_id ORDER BY r.created_at DESC LIMIT 10";
-                    $review_result = $conn->query($sql_reviews);
+                    $sql_reviews = "SELECT r.rating, r.comment, r.created_at, u.username FROM reviews r JOIN users u ON r.user_id = u.id WHERE r.product_id = ? ORDER BY r.created_at DESC LIMIT 10";
+                    $review_stmt = $conn->prepare($sql_reviews);
+                    $review_stmt->bind_param("i", $first_id);
+                    $review_stmt->execute();
+                    $review_result = $review_stmt->get_result();
                     if ($review_result) {
                         while ($rev = $review_result->fetch_assoc()) {
                             $reviews[] = $rev;
@@ -347,15 +398,18 @@ if ($result === FALSE) {
                         $review_result->free();
                     }
                     $count_reviews = 0;
-                    $sql_count = "SELECT COUNT(*) as total_reviews FROM reviews WHERE product_id = $first_id";
-                    $count_result = $conn->query($sql_count);
+                    $sql_count = "SELECT COUNT(*) as total_reviews FROM reviews WHERE product_id = ?";
+                    $count_stmt = $conn->prepare($sql_count);
+                    $count_stmt->bind_param("i", $first_id);
+                    $count_stmt->execute();
+                    $count_result = $count_stmt->get_result();
                     if ($count_result) {
                         $count_reviews = $count_result->fetch_assoc()['total_reviews'] ?? 0;
                         $count_result->free();
                     }
                 ?>
-                    <div class="col-lg-4 col-md-6 col-sm-12 mb-4">
-                        <div class="card shadow-sm h-100">
+                    <div class="col-lg-4 col-md-6 col-sm-12 mb-4 product-card-wrap">
+                        <div class="card shadow-sm h-100 product-card">
                             <img src="../images/<?= $image_path ?>" class="card-img-top product-img"
                                 alt="<?= $full_name ?>">
                             <div class="card-body">
@@ -385,11 +439,12 @@ if ($result === FALSE) {
                                     <?php endif; ?>
                                 </p>
 
-                                <button class="btn btn-primary w-100" data-bs-toggle="modal"
-                                    data-bs-target="#chooseColor<?= $first_id ?>">
-                                    Thêm vào giỏ hàng
+                                <button class="btn btn-primary w-100 mb-2" data-bs-toggle="modal"
+                                    data-bs-target="#chooseColor<?= $first_id ?>"
+                                    <?= $total_stock <= 0 ? 'disabled' : '' ?>>
+                                    <?= $total_stock > 0 ? 'Thêm vào giỏ hàng' : 'Hết hàng' ?>
                                 </button>
-                                <button class="btn btn-secondary w-100" data-bs-toggle="modal"
+                                <button class="btn btn-secondary w-100 mb-2" data-bs-toggle="modal"
                                     data-bs-target="#reviewModal<?= $first_id ?>">Xem đánh giá
                                     (<?= $count_reviews ?>)</button>
                                 <?php if (!isset($_SESSION["user_id"])): ?>
@@ -412,6 +467,7 @@ if ($result === FALSE) {
                         <div class="modal-dialog modal-dialog-centered">
                             <div class="modal-content">
                                 <form action="/user/cart_add.php" method="POST">
+                                    <?= csrf_field() ?>
                                     <input type="hidden" name="choose" value="1">
                                     <div class="modal-header">
                                         <h5 class="modal-title"><?= $full_name ?></h5>
@@ -452,7 +508,8 @@ if ($result === FALSE) {
                                                 <input class="form-check-input" type="radio" name="product_id"
                                                     value="<?= htmlspecialchars($pid) ?>"
                                                     id="opt<?= htmlspecialchars($pid) ?>"
-                                                    <?= $index === 0 ? 'required' : '' ?>>
+                                                    <?= $index === 0 ? 'checked required' : '' ?>
+                                                    <?= $stock <= 0 ? 'disabled' : '' ?>>
                                             </div>
                                             <div class="me-3" style="width:64px;height:48px">
                                                 <img src="../images/<?= htmlspecialchars($img) ?>"
@@ -473,7 +530,7 @@ if ($result === FALSE) {
                                         <div class="mt-3">
                                             <label class="form-label fw-bold">Số lượng</label>
                                             <input type="number" name="quantity" class="form-control" value="1" min="1"
-                                                max="quantity" required>
+                                                max="<?= max(1, $total_stock) ?>" required>
                                         </div>
                                     </div>
 
@@ -493,7 +550,9 @@ if ($result === FALSE) {
                         <div class="modal-dialog modal-dialog-centered">
                             <div class="modal-content">
                                 <form action="/user/wishlist_add.php" method="POST">
-                                    <input type="hidden" name="redirect" value="<?= $_SERVER['REQUEST_URI'] ?>">
+                                    <?= csrf_field() ?>
+                                    <input type="hidden" name="redirect"
+                                        value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
                                     <div class="modal-header">
                                         <h5><?= $full_name ?></h5>
                                         <button class="btn-close" data-bs-dismiss="modal"></button>

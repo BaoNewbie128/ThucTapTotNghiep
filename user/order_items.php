@@ -1,53 +1,86 @@
 <?php
     session_start();
     include __DIR__ . "/../config/db.php";
+    require_once __DIR__ . "/../includes/security.php";
     if(!isset($_SESSION["user_id"])){
         header("Location: ../login.php");
         exit;
     }
-    $user_id = $_SESSION["user_id"];
-     $sql = "SELECT id,total,status,created_at FROM orders WHERE user_id = $user_id AND status ORDER BY id DESC";
-    $orders=$conn->query($sql);
+    $user_id = intval($_SESSION["user_id"]);
+
+    if($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['id'])){
+        verify_csrf();
+        $action = $_POST['action'];
+        $order_id = intval($_POST['id']);
+        $conn->begin_transaction();
+        try {
+            $stmt = $conn->prepare("SELECT id, status FROM orders WHERE id = ? AND user_id = ? FOR UPDATE");
+            $stmt->bind_param("ii", $order_id, $user_id);
+            $stmt->execute();
+            $orderRow = $stmt->get_result()->fetch_assoc();
+            if (!$orderRow) {
+                throw new Exception("Không tìm thấy đơn hàng.");
+            }
+
+            if($action === 'pending_payment'){
+                if ($orderRow['status'] !== 'pending') {
+                    throw new Exception("Đơn hàng không thể chuyển sang chờ thanh toán.");
+                }
+                $stmt = $conn->prepare("UPDATE orders SET status = 'pending_payment' WHERE id = ? AND user_id = ?");
+                $stmt->bind_param("ii", $order_id, $user_id);
+                $stmt->execute();
+                $_SESSION['message'] = "Đã gửi yêu cầu thanh toán, vui lòng chờ xác nhận từ hệ thống.";
+            } elseif($action === 'delete_all'){
+                if (in_array($orderRow['status'], ['cancelled', 'shipping', 'completed'], true)) {
+                    throw new Exception("Đơn hàng này không thể hủy.");
+                }
+
+                $stmt = $conn->prepare("SELECT product_id, quantity FROM order_items WHERE order_id = ?");
+                $stmt->bind_param("i", $order_id);
+                $stmt->execute();
+                $itemsToReturn = $stmt->get_result();
+                $stmtStock = $conn->prepare("UPDATE products SET stock = stock + ? WHERE id = ?");
+                while($item = $itemsToReturn->fetch_assoc()){
+                    $quantity = intval($item['quantity']);
+                    $product_id = intval($item['product_id']);
+                    $stmtStock->bind_param("ii", $quantity, $product_id);
+                    $stmtStock->execute();
+                }
+
+                $stmt = $conn->prepare("UPDATE orders SET status = 'cancelled' WHERE id = ? AND user_id = ?");
+                $stmt->bind_param("ii", $order_id, $user_id);
+                $stmt->execute();
+                $_SESSION['message'] = "Hủy đơn hàng thành công.";
+            } else {
+                throw new Exception("Thao tác không hợp lệ.");
+            }
+            $conn->commit();
+        } catch (Throwable $e) {
+            $conn->rollback();
+            $_SESSION['message'] = $e->getMessage();
+        }
+        header("Location: order_items.php");
+        exit;
+    }
+
+    $stmt = $conn->prepare("SELECT id,total,status,created_at,shipping_fee,discount FROM orders WHERE user_id = ? ORDER BY id DESC");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $orders = $stmt->get_result();
     $orderlist = [];
     if($orders && $orders->num_rows >0){
-        while($order = $orders->fetch_assoc()){
-            $order_item_id = $order['id'];
-            $sql2 = "SELECT oi.product_id,oi.quantity,p.brand,p.model,p.image,p.price,p.color
+        $stmtItems = $conn->prepare("SELECT oi.product_id,oi.quantity,p.brand,p.model,p.image,p.price,p.color
                      FROM order_items oi 
                      JOIN products p ON oi.product_id = p.id 
-                     WHERE oi.order_id = $order_item_id";
-            $item2 = $conn->query($sql2);
-            $orderlist[] = ['order' => $order, 'items' => $item2];
+                     WHERE oi.order_id = ?");
+        while($order = $orders->fetch_assoc()){
+            $order_item_id = intval($order['id']);
+            $stmtItems->bind_param("i", $order_item_id);
+            $stmtItems->execute();
+            $rows = $stmtItems->get_result()->fetch_all(MYSQLI_ASSOC);
+            $orderlist[] = ['order' => $order, 'items' => $rows];
         }
     }
-    if(isset($_GET['action'])  && isset($_GET['id'])){
-        $action = $_GET['action'];
-        $order_id = intval($_GET['id']);
-        if($action == 'pending_payment'){
-            $sql = "UPDATE orders SET status = 'pending_payment' WHERE id = $order_id";
-            $conn->query($sql);
-            $_SESSION['message'] = "Đã gửi yêu cầu thanh toán,vui lòng chờ xác nhận từ hệ thống.";
-        }
-        if($action == 'delete_all'){
-            // LUÔN cộng lại stock dù action là gì để tránh lỗi stock khi hủy đơn hàng hoặc hủy sau khi đã thanh toán
-            $isItemReturn_query = $conn->query("SELECT product_id,quantity FROM order_items WHERE order_id = $order_id");
-            if($isItemReturn_query->num_rows > 0){
-                while($item = $isItemReturn_query->fetch_assoc()){
-                    $product_id = $item['product_id'];
-                $quantity = $item['quantity'];
-                $conn->query("UPDATE products SET stock = stock + $quantity WHERE id = $product_id");
-                }  
-            }
-            $sql_update_order = "UPDATE orders SET status = 'cancelled' WHERE id = $order_id";
-            if($conn->query($sql_update_order)===true){
-                $_SESSION['message'] = "Hủy đơn hàng thành công.";
-            }else{
-                $_SESSION['message'] = "Lỗi khi hủy đơn hàng" . $conn->error;
-            }
-        }
-     header("Location: order_items.php");
-    exit; 
-    } 
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -77,14 +110,15 @@
                 $order = $orderData['order'];
                 $items = $orderData['items'];
                  $total = 0;
-            if($items && $items->num_rows > 0){
-                $items->data_seek(0);
-                while($r = $items->fetch_assoc()){
+            if(!empty($items)){
+                foreach($items as $r){
                     $total += (float)$r['price'] * (int)$r['quantity'];
                 }
-                // reset pointer để sau này render lại list
-                $items->data_seek(0);
             }
+                $discount = $order['discount'] ?? 0;
+                $shipping_fee = $order['shipping_fee'] ?? 0;
+                $grand_total = $total + $shipping_fee - $discount;
+                if($grand_total < 0) $grand_total = 0;
                 $statusTrans = [
                     'pending' => 'Chưa xử lý',
                     'paid' => 'Đã thanh toán',
@@ -116,10 +150,10 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if($items->num_rows >0):?>
+                            <?php if(!empty($items)):?>
 
                             <?php
-                             while($row = $items->fetch_assoc()):
+                             foreach($items as $row):
                             $subtotal = $row["price"] * $row["quantity"];
                             ?>
                             <tr>
@@ -141,15 +175,27 @@
                                     <?php endif; ?>
                                 </td>
                             </tr>
-                            <?php endwhile; ?>
+                            <?php endforeach; ?>
                             <?php else: ?>
                             <tr>
                                 <td colspan="5" class="text-center text-muted">Không có sản phẩm nào</td>
                             </tr>
                             <?php endif; ?>
                             <tr class="table-light fw-bold">
-                                <td colspan="5" class="text-end">Tổng cộng:</td>
+                                <td colspan="5" class="text-end">Tổng sản phẩm:</td>
                                 <td class="text-danger"><?= number_format($total) ?>₫</td>
+                            </tr>
+                            <tr class="table-light fw-bold">
+                                <td colspan="5" class="text-end">Phí ship:</td>
+                                <td class="text-warning"><?= number_format($shipping_fee) ?>₫</td>
+                            </tr>
+                            <tr class="table-light fw-bold">
+                                <td colspan="5" class="text-end">Giảm giá:</td>
+                                <td class="text-success">-<?= number_format($discount) ?>₫</td>
+                            </tr>
+                            <tr class="table-light fw-bold">
+                                <td colspan="5" class="text-end">Tổng cộng:</td>
+                                <td class="text-danger"><?= number_format($grand_total) ?>₫</td>
                             </tr>
                         </tbody>
                     </table>
@@ -158,9 +204,8 @@
 
                 <!-- Mobile Card View -->
                 <div class="d-md-none p-3">
-                    <?php $items->data_seek(0); ?>
-                    <?php if($items->num_rows >0):?>
-                    <?php while($row = $items->fetch_assoc()):
+                    <?php if(!empty($items)):?>
+                    <?php foreach($items as $row):
                     $subtotal = $row["price"] * $row["quantity"];
                     ?>
                     <div class="mb-3 pb-3 border-bottom">
@@ -184,11 +229,17 @@
                             </div>
                         </div>
                     </div>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
 
                     <div class="mt-3 pt-2 border-top">
-                        <h6 class="text-end">Tổng cộng: <span
+                        <h6 class="text-end">Tổng sản phẩm: <span
                                 class="text-danger fw-bold"><?= number_format($total) ?>₫</span></h6>
+                        <h6 class="text-end">Phí ship: <span
+                                class="text-warning fw-bold"><?= number_format($shipping_fee) ?>₫</span></h6>
+                        <h6 class="text-end">Giảm giá: <span
+                                class="text-warning fw-bold">-<?= number_format($discount) ?>₫</span></h6>
+                        <h6 class="text-end">Tổng cộng: <span
+                                class="text-danger fw-bold"><?= number_format($grand_total) ?>₫</span></h6>
                     </div>
                     <?php else: ?>
                     <div class="alert alert-info mb-0">Không có sản phẩm nào</div>
@@ -197,13 +248,16 @@
             </div>
             <div class="card-footer bg-light">
                 <?php if(! in_array($order['status'],['paid', 'shipping', 'completed','cancelled'])):?>
-                <a href="order_items.php?action=delete_all&id=<?= $order['id'] ?>" class="btn btn-danger btn-sm w-20"
-                    onclick="return confirm('Bạn muốn hủy đơn hàng này?');">
-                    Hủy đơn hàng
-                </a>
+                <form method="post" action="order_items.php" class="d-inline"
+                    onsubmit="return confirm('Bạn muốn hủy đơn hàng này?');">
+                    <?= csrf_field() ?>
+                    <input type="hidden" name="action" value="delete_all">
+                    <input type="hidden" name="id" value="<?= $order['id'] ?>">
+                    <button type="submit" class="btn btn-danger btn-sm w-20">Hủy đơn hàng</button>
+                </form>
                 <?php endif; ?>
                 <?php if($order['status'] === 'pending'): ?>
-                <button class="btn btn-success btn-sm w-20" onclick="toggleQR(<?= $order['id'] ?>, <?= $total ?>)">
+                <button class="btn btn-success btn-sm w-20" onclick="toggleQR(<?= $order['id'] ?>)">
                     Thanh Toán
                 </button>
                 <?php elseif($order['status'] === 'paid'): ?>
@@ -227,15 +281,17 @@
 
                 <div id="qr_box_<?= $order['id'] ?>" class="mt-3 p-3 bg-white border rounded d-none">
                     <h6>Quét mã để thanh toán</h6>
-                    <p>Số tiền: <strong class="text-danger"><?= number_format($total) ?>₫</strong></p>
+                    <p>Số tiền: <strong class="text-danger"><?= number_format($grand_total) ?>₫</strong></p>
                     <p>Vui lòng nhập nội dung chuyển khoản như sau: MA DON HANG <?=$order['id']  ?> </p>
                     <img src="../images/qr_thanhtoan.jpg" width="250" class="border rounded">
                     <div class="mt-3">
-                        <a href="order_items.php?action=pending_payment&id=<?= $order['id'] ?>"
-                            class="btn btn-primary btn-sm"
-                            onclick="return confirm('Bạn đã chuyển khoản? Chờ admin xác nhận nhé!')">
-                            Tôi đã chuyển khoản
-                        </a>
+                        <form method="post" action="order_items.php" class="d-inline"
+                            onsubmit="return confirm('Bạn đã chuyển khoản? Chờ admin xác nhận nhé!');">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="action" value="pending_payment">
+                            <input type="hidden" name="id" value="<?= $order['id'] ?>">
+                            <button type="submit" class="btn btn-primary btn-sm">Tôi đã chuyển khoản</button>
+                        </form>
                         <button class="btn btn-secondary btn-sm" onclick="toggleQR(<?= $order['id'] ?>)">
                             Đóng
                         </button>
@@ -250,7 +306,7 @@
         </div>
     </div>
     <script>
-    function toggleQR(orderId, total = 0) {
+    function toggleQR(orderId) {
         const box = document.getElementById("qr_box_" + orderId);
         box.classList.toggle("d-none");
     }

@@ -10,7 +10,7 @@ if(!$email || !$verified){
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
     $password = $_POST['password'];
 
-    if(!\Validator::min($password,6)){
+    if(!\Validator::minLength($password,6)){
         $error = "Mật khẩu >= 6 ký tự";
     } else {
         $hash = password_hash($password, PASSWORD_DEFAULT);

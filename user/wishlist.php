@@ -1,13 +1,13 @@
 <?php
     session_start();
     require_once __DIR__ . "/../config/db.php";
+    require_once __DIR__ . "/../includes/security.php";
     if (!isset($_SESSION['initiated'])) {
     session_regenerate_id(true);
     $_SESSION['initiated'] = true;
 }
     if (!isset($_SESSION['user_id'])) {
-    $_SESSION['wishlist_pending'] = $_POST['product_id'];
-    $_SESSION['redirect_after_login'] = $_POST['redirect'] ?? '../index.php';
+    $_SESSION['redirect_after_login'] = '../index.php';
     header("Location: ../login.php");
     exit();
 }
@@ -47,21 +47,27 @@ while ($row = $result->fetch_assoc()) {
     $row['stocks_list'] = explode('||', $row['stocks']);
     $row['prices_list'] = explode('||', $row['prices']);
     $row['image_cover'] = $row['images_list'][0] ?? 'placeholder.png';
-    $first_id = $row['ids_list'][0];
+    $first_id = intval($row['ids_list'][0]);
     $reviews =[];
     $sql_reviews = "SELECT r.rating,r.comment,r.created_at,u.username FROM reviews r 
     JOIN users u ON r.user_id = u.id 
-    WHERE r.product_id = $first_id 
+    WHERE r.product_id = ? 
     ORDER BY r.created_at DESC LIMIT 10";
-    $review_ressult = $conn->query($sql_reviews);
+    $review_stmt = $conn->prepare($sql_reviews);
+    $review_stmt->bind_param("i", $first_id);
+    $review_stmt->execute();
+    $review_ressult = $review_stmt->get_result();
     if($review_ressult){
         while($review = $review_ressult->fetch_assoc()){
             $reviews[] = $review;
         }
     }
     $row['reviews'] = $reviews;
-    $sql_count_reviews = "SELECT COUNT(*) AS total_reviews FROM reviews WHERE product_id = $first_id";
-    $count_result = $conn->query($sql_count_reviews);
+    $sql_count_reviews = "SELECT COUNT(*) AS total_reviews FROM reviews WHERE product_id = ?";
+    $count_stmt = $conn->prepare($sql_count_reviews);
+    $count_stmt->bind_param("i", $first_id);
+    $count_stmt->execute();
+    $count_result = $count_stmt->get_result();
     $row['total_reviews'] = ($count_result) ? $count_result->fetch_assoc()['total_reviews'] : 0;
     $products[] = $row;
 }
@@ -145,6 +151,7 @@ while ($row = $result->fetch_assoc()) {
                 <div class="modal-dialog modal-dialog-centered">
                     <div class="modal-content">
                         <form action="/user/cart_add.php" method="POST">
+                            <?= csrf_field() ?>
                             <input type="hidden" name="choose" value="1">
 
                             <div class="modal-header">
@@ -183,7 +190,8 @@ while ($row = $result->fetch_assoc()) {
                     ?>
 
                                 <div class="d-flex align-items-center mb-2">
-                                    <input type="radio" name="product_id" value="<?= $pid ?>" required>
+                                    <input type="radio" name="product_id" value="<?= htmlspecialchars($pid) ?>"
+                                        required>
                                     <img src="../images/<?= $img ?>" width="60" class="mx-2">
 
                                     <div>
@@ -196,7 +204,8 @@ while ($row = $result->fetch_assoc()) {
                                 <?php endforeach; ?>
                                 <?php endif; ?>
 
-                                <input type="number" name="quantity" value="1" min="1" class="form-control mt-2">
+                                <input type="number" name="quantity" value="1" min="1" max="<?= max(1, $total_stock) ?>"
+                                    class="form-control mt-2">
                             </div>
 
                             <div class="modal-footer">
@@ -283,7 +292,8 @@ while ($row = $result->fetch_assoc()) {
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'
                     },
-                    body: 'product_id=' + id
+                    body: 'product_id=' + encodeURIComponent(id) +
+                        '&csrf_token=<?= urlencode(csrf_token()) ?>'
                 })
                 .then(res => res.text())
                 .then(data => {

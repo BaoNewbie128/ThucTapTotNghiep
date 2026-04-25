@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../includes/admin_auth_check.php';
     require __DIR__ . "/../config/db.php";
     $orders = [];
     $error_message ="";
@@ -12,8 +13,11 @@ $count_sql = "SELECT COUNT(*) as total FROM (
     $count_result = $conn->query($count_sql);
     $total_products = $count_result->fetch_assoc()['total'] ?? 0;
     $total_pages = ceil($total_products / $limit);
-    $sql = "SELECT o.id,u.username,o.total,o.status,o.created_at FROM orders o JOIN users u ON o.user_id = u.id ORDER BY o.id DESC LIMIT $limit OFFSET $offset";
-$result = $conn->query($sql);
+    $sql = "SELECT o.id,u.username,o.total,o.status,o.created_at FROM orders o JOIN users u ON o.user_id = u.id ORDER BY o.id DESC LIMIT ? OFFSET ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("ii", $limit, $offset);
+$stmt->execute();
+$result = $stmt->get_result();
 if ($result === FALSE) {
     $error_message = '<div class="alert alert-danger text-center">Lỗi truy vấn: ' . $conn->error . '</div>';
 } else {

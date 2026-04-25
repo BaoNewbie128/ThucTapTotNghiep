@@ -2,19 +2,19 @@
 session_start();
 include __DIR__ ."/../includes/auth_check.php";
 require_once __DIR__ . "/../config/db.php";
+require_once __DIR__ . "/../includes/security.php";
 if(!isset($_GET['back_url'])){
-    $_SESSION['back_url'] =$_SERVER['HTTP_REFERER'] ?? '/index.php';
+    $_SESSION['back_url'] = is_safe_local_url($_SERVER['HTTP_REFERER'] ?? '/index.php');
 }
 if(isset($_GET['back_url'])){
-    $_SESSION['back_url'] = $_GET['back_url'];
+    $_SESSION['back_url'] = is_safe_local_url($_GET['back_url']);
 }
-    if(!isset($_GET['product_id'])){
-        die("<div class='alert alert-danger text-center'>Thiếu product_id!</div>");
-    }
-    $product_id = intval($_GET['product_id']);
-    $user_id = $_SESSION['user_id'];
-    $message = "";
-    $message = "";
+if(!isset($_GET['product_id'])){
+    die("<div class='alert alert-danger text-center'>Thiếu product_id!</div>");
+}
+$product_id = intval($_GET['product_id']);
+$user_id = intval($_SESSION['user_id']);
+$message = "";
 
 if(isset($_GET['msg'])){
     if($_GET['msg'] == 'deleted'){
@@ -27,35 +27,45 @@ if(isset($_GET['msg'])){
         $message = "<div class='alert alert-danger text-center'>Có lỗi xảy ra!</div>";
     }
 }
-    $sql = "SELECT brand, model,image FROM products WHERE id = $product_id";
-    $prod = $conn->query($sql)->fetch_assoc();
-    if(!$prod){
-        die("<div class='alert alert-danger text-center'>Sản phẩm không tồn tại!</div>");
+$stmt = $conn->prepare("SELECT brand, model, image FROM products WHERE id = ?");
+$stmt->bind_param("i", $product_id);
+$stmt->execute();
+$prod = $stmt->get_result()->fetch_assoc();
+if(!$prod){
+    die("<div class='alert alert-danger text-center'>Sản phẩm không tồn tại!</div>");
+}
+// delete
+if(isset($_POST['delete_review'])){
+    verify_csrf();
+    $review_id = intval($_POST['delete_review']);
+    $stmt = $conn->prepare("DELETE FROM reviews WHERE id = ? AND user_id = ?");
+    $stmt->bind_param("ii", $review_id, $user_id);
+    $stmt->execute();
+    if($stmt->affected_rows === 1){
+        header("Location: reviews.php?product_id=$product_id&msg=deleted");
+        exit;
+    }else{
+        header("Location: reviews.php?product_id=$product_id&msg=error");
+        exit;
     }
-    // delete
-    if(isset($_GET['delete_review'])){
-        $review_id = intval($_GET['delete_review']);
-        $check = $conn->query("SELECT * FROM reviews WHERE id = $review_id AND user_id = $user_id");
-        if($check->num_rows ===1){
-            $conn->query("DELETE FROM reviews WHERE id = $review_id");
-            header("Location: reviews.php?product_id=$product_id&msg=deleted");
-            exit;
-        }else{
-            header("Location: reviews.php?product_id=$product_id&msg=error");
-            exit;
-        }
-    }
+}
     // edit
     if(isset($_POST['edit_review_id'])){
+        verify_csrf();
         $review_id = intval($_POST['edit_review_id']);
-        $new_comment = $conn->real_escape_string($_POST['edit_comment']);
+        $new_comment = trim($_POST['edit_comment'] ?? '');
         $new_rating = intval($_POST['edit_rating'] ?? 10);
         if($new_rating < 1 || $new_rating > 10){
           $new_rating = 10;
         }
-        $check = $conn->query("SELECT * FROM reviews WHERE id = $review_id AND user_id = $user_id");
-        if($check->num_rows ===1){
-            $conn->query("UPDATE reviews SET comment='$new_comment', rating=$new_rating WHERE id = $review_id");
+        if($new_comment === ''){
+            header("Location: reviews.php?product_id=$product_id&msg=error");
+            exit;
+        }
+        $stmt = $conn->prepare("UPDATE reviews SET comment = ?, rating = ? WHERE id = ? AND user_id = ?");
+        $stmt->bind_param("siii", $new_comment, $new_rating, $review_id, $user_id);
+        $stmt->execute();
+        if($stmt->affected_rows >= 0){
             header("Location: reviews.php?product_id=$product_id&msg=updated");
             exit;
             
@@ -68,25 +78,42 @@ if(isset($_GET['msg'])){
 
     // create
     if($_SERVER["REQUEST_METHOD"] === "POST"  && !isset($_POST['edit_review_id'])){
-        $comment = $conn->real_escape_string($_POST['comment']);
+        verify_csrf();
+        $comment = trim($_POST['comment'] ?? '');
         $rating = intval($_POST['rating'] ?? 10);
         if($rating < 1 || $rating > 10){
           $rating = 10;
         }
-        $sql_insert = "INSERT INTO reviews (user_id, product_id, rating, comment, created_at) VALUES ($user_id, $product_id, $rating, '$comment', NOW())";
-        if($conn->query($sql_insert) === TRUE){
-            $message = "<div class='alert alert-success text-center'>Đánh giá đã được gửi !</div>";
+        if($comment === ''){
+            $message = "<div class='alert alert-danger text-center'>Vui lòng nhập nội dung đánh giá!</div>";
         } else {
-            $message = "<div class='alert alert-danger text-center'>Lỗi khi gửi đánh giá: " . $conn->error . "</div>";
+            $stmt = $conn->prepare("SELECT id FROM reviews WHERE user_id = ? AND product_id = ?");
+            $stmt->bind_param("ii", $user_id, $product_id);
+            $stmt->execute();
+            $exists = $stmt->get_result();
+            if($exists->num_rows > 0){
+                $message = "<div class='alert alert-warning text-center'>Bạn đã đánh giá sản phẩm này. Vui lòng sửa đánh giá cũ nếu muốn thay đổi.</div>";
+            } else {
+                $stmt = $conn->prepare("INSERT INTO reviews (user_id, product_id, rating, comment, created_at) VALUES (?, ?, ?, ?, NOW())");
+                $stmt->bind_param("iiis", $user_id, $product_id, $rating, $comment);
+                if($stmt->execute()){
+                    $message = "<div class='alert alert-success text-center'>Đánh giá đã được gửi !</div>";
+                } else {
+                    $message = "<div class='alert alert-danger text-center'>Lỗi khi gửi đánh giá.</div>";
+                }
+            }
         }
     }
     // read
-    $sql_reviews = "SELECT r.id,r.user_id,r.rating, r.comment, r.created_at, u.username 
+$sql_reviews = "SELECT r.id,r.user_id,r.rating, r.comment, r.created_at, u.username 
                     FROM reviews r 
                     JOIN users u ON r.user_id = u.id 
-                    WHERE r.product_id = $product_id 
+                    WHERE r.product_id = ? 
                     ORDER BY r.created_at DESC";
-    $reviews = $conn->query($sql_reviews);
+$stmt = $conn->prepare($sql_reviews);
+$stmt->bind_param("i", $product_id);
+$stmt->execute();
+$reviews = $stmt->get_result();
 ?>
 
 <!DOCTYPE html>
@@ -111,12 +138,13 @@ if(isset($_GET['msg'])){
                         <img src="../images/<?= htmlspecialchars($prod['image']) ?>" alt="car"
                             style="width: 100px; height: 70px; object-fit: cover; border-radius: 6px;" class="me-3">
                     </h5>
-                    <a href="<?= $_SESSION['back_url']  ??'/index.php.php' ?> " class="btn-close"></a>
+                    <a href="<?= htmlspecialchars($_SESSION['back_url']  ??'/index.php') ?>" class="btn-close"></a>
                 </div>
                 <div class="modal-body">
                     <?= $message ?>
                     <h5 class="fw-bold mb-3">Viết đánh giá của bạn</h5>
                     <form method="POST" class="mb-4">
+                        <?= csrf_field() ?>
                         <div class="d-flex align-items-center mb-3">
                             <!-- Ảnh xe -->
 
@@ -160,11 +188,12 @@ if(isset($_GET['msg'])){
                                 Sửa
                             </button>
 
-                            <a href="?product_id=<?= $product_id ?>&delete_review=<?= $r['id'] ?>"
-                                class="btn btn-sm btn-danger"
-                                onclick="return confirm('Bạn chắc chắn muốn xóa đánh giá này?')">
-                                Xóa
-                            </a>
+                            <form method="POST" class="d-inline"
+                                onsubmit="return confirm('Bạn chắc chắn muốn xóa đánh giá này?')">
+                                <?= csrf_field() ?>
+                                <input type="hidden" name="delete_review" value="<?= $r['id'] ?>">
+                                <button type="submit" class="btn btn-sm btn-danger">Xóa</button>
+                            </form>
                         </div>
                         <?php endif; ?>
                     </div>
@@ -184,6 +213,7 @@ if(isset($_GET['msg'])){
         <div class="modal-dialog">
             <div class="modal-content">
                 <form method="POST">
+                    <?= csrf_field() ?>
                     <div class="modal-header">
                         <h5 class="modal-title">Sửa đánh giá</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>

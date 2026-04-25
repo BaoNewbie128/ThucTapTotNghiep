@@ -8,60 +8,94 @@ use PHPMailer\PHPMailer\Exception;
 require __DIR__ . '/../vendor/autoload.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = trim($_POST['email'] ?? '');
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
 
-    $email = trim($_POST['email']);
-
-    // 1. Kiểm tra email tồn tại
-    $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $result = $stmt->get_result();
-
-    if ($result->num_rows == 0) {
-        $error = "Email không tồn tại!";
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Email không hợp lệ!";
     } else {
+        $message = "Nếu email tồn tại, chúng tôi sẽ gửi mã OTP.";
 
-        // 2. Tạo OTP
-        $otp = rand(100000, 999999);
-        $expires = date("Y-m-d H:i:s", strtotime("+5 minutes"));
-
-        // 3. Xóa OTP cũ
-        $stmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
-        $stmt->bind_param("s", $email);
+        $stmt = $conn->prepare("DELETE FROM password_resets WHERE expires_at <= NOW()");
         $stmt->execute();
 
-        // 4. Lưu OTP mới
-        $stmt = $conn->prepare("INSERT INTO password_resets (email, otp, expires_at) VALUES (?, ?, ?)");
-        $stmt->bind_param("sss", $email, $otp, $expires);
+        $stmt = $conn->prepare("SELECT COUNT(*) AS total FROM password_resets WHERE request_ip = ? AND created_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)");
+        $stmt->bind_param("s", $ip);
         $stmt->execute();
+        $ipRequests = (int)($stmt->get_result()->fetch_assoc()['total'] ?? 0);
 
-        // 5. Gửi mail
-        $mail = new PHPMailer(true);
+        if ($ipRequests >= 5) {
+            $error = "Bạn gửi OTP quá nhiều lần. Vui lòng thử lại sau 15 phút.";
+        } else {
+            $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
 
-        try {
-            $mail->isSMTP();
-            $mail->Host = 'smtp.gmail.com';
-            $mail->SMTPAuth = true;
+            if ($result->num_rows > 0) {
+                $stmt = $conn->prepare("SELECT id FROM password_resets WHERE email = ? AND last_sent_at > DATE_SUB(NOW(), INTERVAL 60 SECOND)");
+                $stmt->bind_param("s", $email);
+                $stmt->execute();
+                $recentOtp = $stmt->get_result();
 
-            $mail->Username = 'binkongu24@gmail.com';
-            $mail->Password = 'yiyo etmj almh yutr';
+                if ($recentOtp->num_rows > 0) {
+                    $error = "Vui lòng chờ 60 giây trước khi gửi lại OTP.";
+                } else {
+                    $otp = rand(100000, 999999);
+                    $otpHash = password_hash((string)$otp, PASSWORD_DEFAULT);
+                    $expires = date("Y-m-d H:i:s", strtotime("+5 minutes"));
 
-            $mail->SMTPSecure = 'tls';
-            $mail->Port = 587;
+                    $stmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
+                    $stmt->bind_param("s", $email);
+                    $stmt->execute();
 
-            $mail->setFrom('binkongu24@gmail.com', 'JDM WORLD');
-            $mail->addAddress($email);
+                    // Store only the hash so a database leak cannot reveal a valid OTP.
+                    $stmt = $conn->prepare("INSERT INTO password_resets (email, otp, expires_at, attempts, last_sent_at, request_ip) VALUES (?, ?, ?, 0, NOW(), ?)");
+                    $stmt->bind_param("ssss", $email, $otpHash, $expires, $ip);
+                    $stmt->execute();
 
-            $mail->Subject = 'OTP Reset Password';
-            $mail->Body = "Mã OTP của bạn là: $otp (hết hạn 5 phút)";
+                    $mail = new PHPMailer(true);
 
-            $mail->send();
-            $_SESSION['reset_email'] = $email;
-            header("Location: verify_otp.php");
-            exit;
+                    try {
+                        $mail->isSMTP();
+                        $mail->Host = SMTP_HOST;
+                        $mail->SMTPAuth = true;
+                        $mail->CharSet = 'UTF-8';
+                        $mail->Encoding = 'base64';
 
-        } catch (Exception $e) {
-            $error = "Gửi email thất bại: " . $mail->ErrorInfo;
+                        $smtpUser = SMTP_USERNAME;
+                        $smtpPass = SMTP_PASSWORD;
+                        $smtpFrom = SMTP_FROM;
+                        $smtpFromName = SMTP_FROM_NAME;
+                        if ($smtpUser === '' || $smtpPass === '') {
+                            throw new Exception('Chưa cấu hình SMTP_USERNAME/SMTP_PASSWORD.');
+                        }
+
+                        $mail->Username = $smtpUser;
+                        $mail->Password = $smtpPass;
+
+                        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                        $mail->Port = SMTP_PORT;
+
+                        $mail->setFrom($smtpFrom, $smtpFromName);
+                        $mail->addAddress($email);
+                        $mail->addReplyTo($smtpFrom, $smtpFromName);
+
+                        $mail->isHTML(true);
+                        $mail->Subject = 'Ma OTP dat lai mat khau JDM World';
+                        $mail->Body = "<p>Ma OTP cua ban la: <strong>$otp</strong></p><p>Ma nay het han sau 5 phut.</p>";
+                        $mail->AltBody = "Ma OTP cua ban la: $otp (het han 5 phut)";
+
+                        $mail->send();
+                        $_SESSION['reset_email'] = $email;
+                        header("Location: verify_otp.php");
+                        exit;
+                    } catch (Exception $e) {
+                        error_log('Reset password email failed: ' . ($mail->ErrorInfo ?: $e->getMessage()));
+                        $error = "Gửi email thất bại. Vui lòng kiểm tra SMTP Gmail/App Password trong cấu hình máy chủ.";
+                    }
+                }
+            }
         }
     }
 }
@@ -74,6 +108,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <h2 class="hero-title">Quên mật khẩu</h2>
                 <?php if (!empty($error)): ?>
                 <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+                <?php endif; ?>
+                <?php if (!empty($message)): ?>
+                <div class="alert alert-info"><?= htmlspecialchars($message) ?></div>
                 <?php endif; ?>
                 <form method="POST">
                     <div class="form-group">

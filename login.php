@@ -2,6 +2,7 @@
 session_start();
 include "config/db.php";
 require_once __DIR__ . "/validation.php";
+require_once __DIR__ . "/includes/security.php";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     $login = trim($_POST["login"]); // username hoặc email
@@ -28,34 +29,43 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 if(isset($_SESSION['pending_cart'])){
     $pending = $_SESSION['pending_cart'];
     $product_id = intval($pending['product_id']);
-    $quantity = intval($pending['quantity']);
-    $user_id = $_SESSION["user_id"];
+    $quantity = max(1, intval($pending['quantity']));
+    $user_id = intval($_SESSION["user_id"]);
 
     if($product_id > 0){
-        $checkProduct = $conn->query("SELECT id FROM products WHERE id = $product_id");
+        $stmt = $conn->prepare("SELECT id FROM products WHERE id = ?");
+        $stmt->bind_param("i", $product_id);
+        $stmt->execute();
+        $checkProduct = $stmt->get_result();
 
         if($checkProduct->num_rows > 0){
-            $sql = "SELECT id FROM cart WHERE user_id = $user_id";
-            $result = $conn->query($sql);
+            $stmt = $conn->prepare("SELECT id FROM cart WHERE user_id = ?");
+            $stmt->bind_param("i", $user_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
 
             if($result->num_rows > 0){
-                $cart_id = $result->fetch_assoc()["id"];
+                $cart_id = intval($result->fetch_assoc()["id"]);
             } else {
-                $conn->query("INSERT INTO cart (user_id) VALUES ($user_id)");
+                $stmt = $conn->prepare("INSERT INTO cart (user_id) VALUES (?)");
+                $stmt->bind_param("i", $user_id);
+                $stmt->execute();
                 $cart_id = $conn->insert_id;
             }
 
-            $sql2 = "SELECT quantity FROM cart_items 
-                     WHERE cart_id = $cart_id AND product_id = $product_id";
-            $result2 = $conn->query($sql2);
+            $stmt = $conn->prepare("SELECT quantity FROM cart_items WHERE cart_id = ? AND product_id = ?");
+            $stmt->bind_param("ii", $cart_id, $product_id);
+            $stmt->execute();
+            $result2 = $stmt->get_result();
 
             if($result2->num_rows > 0){
-                $conn->query("UPDATE cart_items 
-                              SET quantity = quantity + $quantity 
-                              WHERE cart_id = $cart_id AND product_id = $product_id");
+                $stmt = $conn->prepare("UPDATE cart_items SET quantity = quantity + ? WHERE cart_id = ? AND product_id = ?");
+                $stmt->bind_param("iii", $quantity, $cart_id, $product_id);
+                $stmt->execute();
             } else {
-                $conn->query("INSERT INTO cart_items (cart_id, product_id, quantity) 
-                              VALUES ($cart_id, $product_id, $quantity)");
+                $stmt = $conn->prepare("INSERT INTO cart_items (cart_id, product_id, quantity) VALUES (?, ?, ?)");
+                $stmt->bind_param("iii", $cart_id, $product_id, $quantity);
+                $stmt->execute();
             }
         }
     }
@@ -75,12 +85,12 @@ if (isset($_SESSION['wishlist_pending'])) {
 
     unset($_SESSION['wishlist_pending']);
 }
-$redirect = $_SESSION['redirect_after_login'] ?? '/index.php';
+$redirect = is_safe_local_url($_SESSION['redirect_after_login'] ?? '/index.php');
 unset($_SESSION['redirect_after_login']);
             if ($user["role"] == "admin") {
                 header("Location: admin/admin_dashboard.php");
             } else {
-                header("Location: $redirect");
+                header("Location: " . $redirect);
             }
             exit;
         }else{

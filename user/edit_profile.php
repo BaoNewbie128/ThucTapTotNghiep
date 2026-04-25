@@ -1,6 +1,10 @@
 <?php
     require __DIR__ . "/../config/db.php";
     require_once __DIR__ . "/../validation.php";
+    if(!isset($_SESSION["user_id"])){
+        header("Location: ../login.php");
+        exit;
+    }
     $user_id = $_SESSION['user_id'];
     $success ="";
     $error_message = "";
@@ -49,7 +53,7 @@
         if(empty($error_message)){
             $update = $conn->prepare("
                 UPDATE users 
-                SET username = ?, email = ?, phone = ?, address = ?, password = ?
+                SET username = ?, email = ?, phone = ?, address = ?, password = ? 
                 WHERE id = ?
             ");
             $update->bind_param("sssssi",
@@ -92,8 +96,10 @@
         <input type="password" name="new_password" class="form-control"> <br>
         <label class="form-label">Số điện thoại</label>
         <input type="text" name="phone" class="form-control" value="<?= htmlspecialchars($phone) ?>" required> <br>
-        <label class="form-label">Địa chỉ</label>
-        <textarea name="address" class="form-control"><?= htmlspecialchars($address) ?></textarea>
+        <br>
+        <label class="form-label">Địa chỉ chi tiết</label>
+        <textarea name="address" class="form-control"
+            placeholder="Số nhà, đường, khu vực..."><?= htmlspecialchars($address) ?></textarea>
         <button type="submit" class="btn btn-primary mt-3">Cập nhật</button>
     </div>
 </form>

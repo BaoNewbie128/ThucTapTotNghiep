@@ -5,22 +5,28 @@
         header("Location: ../login.php");
         exit;
     }
-    $user_id = $_SESSION["user_id"];
+    $user_id = intval($_SESSION["user_id"]);
     $sql = "SELECT id, total, status,created_at 
             FROM orders 
-            WHERE user_id = $user_id 
+            WHERE user_id = ? 
             AND status IN ('paid','shipping','completed','cancelled')
             ORDER BY created_at DESC";
-    $orders = $conn->query($sql);
-    $orders_list = [];
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $orders = $stmt->get_result();
+    $orderlist = [];
     if($orders->num_rows > 0){
         while($order = $orders->fetch_assoc()){
-            $order_id = $order['id'];
+            $order_id = intval($order['id']);
             $sql2 = "SELECT oi.product_id,oi.quantity,p.brand,p.model,p.image,p.price,p.color
                  FROM order_items oi 
                  JOIN products p ON oi.product_id = p.id 
-                 WHERE oi.order_id = $order_id";
-                 $items = $conn->query($sql2);
+                  WHERE oi.order_id = ?";
+                 $item_stmt = $conn->prepare($sql2);
+                 $item_stmt->bind_param("i", $order_id);
+                 $item_stmt->execute();
+                 $items = $item_stmt->get_result();
         $orderlist[] = ['order'=>$order,'items'=>$items];
         }
     }
