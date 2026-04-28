@@ -11,6 +11,13 @@ if (!isset($_SESSION["user_id"])) {
 $user_id = intval($_SESSION["user_id"]);
 if (isset($_POST["action"]) && $_POST["action"] === "checkout") {
     verify_csrf();
+    $payment_method = $_POST['payment_method'] ?? 'bank_transfer';
+    if (!in_array($payment_method, ['bank_transfer', 'cod'], true)) {
+        $_SESSION['message'] = "Phương thức thanh toán không hợp lệ.";
+        header("Location: cart_item.php");
+        exit;
+    }
+
     $conn->begin_transaction();
     try {
         $stmt = $conn->prepare("SELECT id FROM cart WHERE user_id = ? FOR UPDATE");
@@ -51,8 +58,9 @@ if (isset($_POST["action"]) && $_POST["action"] === "checkout") {
         $discount_amount = min($total_amount, (float)($_SESSION['coupon']['discount'] ?? 0));
         $total_with_shipping = max(0, $total_amount + $shipping_fee - $discount_amount);
 
-        $stmt = $conn->prepare("INSERT INTO orders (user_id, status, total, shipping_fee, discount) VALUES (?, 'pending', ?, ?, ?)");
-        $stmt->bind_param("iddd", $user_id, $total_with_shipping, $shipping_fee, $discount_amount);
+        $order_status = $payment_method === 'cod' ? 'cod_pending' : 'pending';
+        $stmt = $conn->prepare("INSERT INTO orders (user_id, status, total, shipping_fee, discount) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("isddd", $user_id, $order_status, $total_with_shipping, $shipping_fee, $discount_amount);
         $stmt->execute();
         $order_id = $conn->insert_id;
 

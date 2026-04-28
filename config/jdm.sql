@@ -106,7 +106,7 @@ CREATE TABLE IF NOT EXISTS `orders` (
   `total` decimal(10,2) NOT NULL,
   `shipping_fee` decimal(10,2) NOT NULL DEFAULT '0.00',
   `discount` decimal(10,2) NOT NULL DEFAULT '0.00',
-  `status` enum('pending','paid','shipping','completed','cancelled','pending_payment') CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'pending',
+  `status` enum('pending','paid','shipping','completed','cancelled','pending_payment','cod_pending') CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT 'pending',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`)

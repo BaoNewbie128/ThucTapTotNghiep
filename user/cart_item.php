@@ -243,11 +243,28 @@ if(isset($_POST['apply_coupon'])){
                                 class="text-danger fw-bold"><?= number_format($grand_total) ?>₫</span></h5>
                     </div>
                     <div class="col-12 col-md-6 mt-3 mt-md-0">
-                        <div class="d-flex gap-2 flex-column flex-md-row">
-                            <a href="/index.php" class="btn btn-secondary btn-sm flex-grow-1">Quay lại</a>
+                        <div class="d-flex gap-2 flex-column flex-md-row align-items-md-start">
+                            <a href="/index.php"
+                                class="btn btn-secondary btn-sm px-3 py-2 flex-shrink-0 align-self-start">Quay lại</a>
                             <form method="post" action="orders.php" class="flex-grow-1">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="action" value="checkout">
+                                <div class="border rounded p-2 mb-2 bg-light">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="payment_method"
+                                            id="payment_bank" value="bank_transfer" checked>
+                                        <label class="form-check-label" for="payment_bank">
+                                            Chuyển khoản trước
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="payment_method"
+                                            id="payment_cod" value="cod">
+                                        <label class="form-check-label" for="payment_cod">
+                                            Trả sau khi nhận hàng
+                                        </label>
+                                    </div>
+                                </div>
                                 <button type="submit" class="btn btn-success btn-sm w-100">Đặt hàng</button>
                             </form>
                         </div>

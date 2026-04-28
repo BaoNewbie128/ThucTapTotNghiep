@@ -7,7 +7,7 @@ if(!isset($_GET['order_id'])){
 }
 
 $order_id = intval($_GET['order_id']);
-$statusOptions = ['pending', 'paid', 'shipping', 'completed', 'cancelled', 'pending_payment'];
+$statusOptions = ['pending', 'paid', 'shipping', 'completed', 'cancelled', 'pending_payment', 'cod_pending'];
 
 if($_SERVER['REQUEST_METHOD'] === 'POST'){
     verify_csrf();

@@ -20,7 +20,8 @@ require_once __DIR__ . '/../includes/admin_auth_check.php';
     'shipping'  => 'Đang giao hàng',
     'completed' => 'Hoàn thành',
     'cancelled'  => 'Đã hủy',
-    'pending_payment' => 'Chờ xác nhận thanh toán'
+    'pending_payment' => 'Chờ xác nhận thanh toán',
+    'cod_pending' => 'Trả sau khi nhận hàng'
 ];
 
 ?>

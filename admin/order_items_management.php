@@ -64,7 +64,9 @@ if ($resultItems->num_rows > 0) {
                     'paid' => 'Đã thanh toán',
                     'shipping' => 'Đang giao hàng',
                     'completed' => 'Hoàn thành',
-                    'cancelled' => 'Đã hủy'
+                    'cancelled' => 'Đã hủy',
+                    'pending_payment' => 'Chờ xác nhận thanh toán',
+                    'cod_pending' => 'Trả sau khi nhận hàng'
                 ];
 $conn->close();
 $items_total = 0;

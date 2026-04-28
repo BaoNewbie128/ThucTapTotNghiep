@@ -125,7 +125,8 @@
                     'shipping' => 'Đang giao hàng',
                     'completed' => 'Hoàn thành',
                     'cancelled' => 'Đã hủy',
-                    'pending_payment' => 'Chờ thanh toán'
+                    'pending_payment' => 'Chờ thanh toán',
+                    'cod_pending' => 'Trả sau khi nhận hàng'
                 ];
         ?>
 
@@ -267,6 +268,9 @@
                 <?php elseif($order['status'] === 'pending_payment'): ?>
                 <p class="fw-bold d-inline-block m-0">Trạng thái đơn hàng : </p>
                 <p class="text-warning fw-bold m-0">Đang chờ admin xác nhận thanh toán</p>
+                <?php elseif($order['status'] === 'cod_pending'): ?>
+                <p class="fw-bold d-inline-block m-0">Trạng thái đơn hàng : </p>
+                <p class="text-info fw-bold m-0">Trả sau khi nhận hàng - chờ admin xử lý đơn</p>
                 <?php elseif($order['status'] === 'shipping'): ?>
                 <p class="fw-bold d-inline-block m-0">Trạng thái đơn hàng : </p>
                 <p class="text-success fw-bold d-inline-block m-0">Đang giao hàng </p>
@@ -301,8 +305,8 @@
         </div>
         <?php endforeach; ?>
 
-        <div class="mt-4">
-            <a href="/index.php" class="btn btn-secondary">Quay lại</a>
+        <div class="mt-3">
+            <a href="/index.php" class="btn btn-secondary btn-sm px-3">Quay lại</a>
         </div>
     </div>
     <script>
