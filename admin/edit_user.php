@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/admin_auth_check.php';
 require __DIR__ . "/../config/db.php";
+require_once __DIR__ . "/../validation.php";
 
 // Lấy ID user
 if (!isset($_GET["user_id"]) || empty($_GET["user_id"])) {
@@ -30,13 +31,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     $phone    = trim($_POST["phone"]);
     $address  = trim($_POST["address"]);
     $role     = trim($_POST["role"]);
+    $password = $_POST["password"] ?? "";
 
     if ($username === "" || $email === "") {
         $message = "Username và Email không được để trống!";
+    } elseif ($password !== "" && !\Validator::minLength($password, 6)) {
+        $message = "Mật khẩu mới phải có ít nhất 6 ký tự!";
     } else {
-        // Update
-        $update = $conn->prepare("UPDATE users SET username=?, email=?, phone=?, address=?, role=? WHERE id=?");
-        $update->bind_param("sssssi", $username, $email, $phone, $address, $role, $user_id);
+        if ($password !== "") {
+            // Nếu admin nhập mật khẩu mới thì hash và ghi đè mật khẩu cũ.
+            $password_hash = password_hash($password, PASSWORD_DEFAULT);
+            $update = $conn->prepare("UPDATE users SET username=?, email=?, phone=?, address=?, role=?, password=? WHERE id=?");
+            $update->bind_param("ssssssi", $username, $email, $phone, $address, $role, $password_hash, $user_id);
+        } else {
+            $update = $conn->prepare("UPDATE users SET username=?, email=?, phone=?, address=?, role=? WHERE id=?");
+            $update->bind_param("sssssi", $username, $email, $phone, $address, $role, $user_id);
+        }
 
         if ($update->execute()) {
             header("Location: admin_dashboard.php?view=users&updated=1");
@@ -66,6 +76,12 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <div class="mb-3">
             <label class="form-label">Email</label>
             <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($user['email']) ?>">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">Mật khẩu mới</label>
+            <input type="password" name="password" class="form-control" placeholder="Để trống nếu không đổi mật khẩu">
+            <div class="form-text">Nhập ít nhất 6 ký tự nếu muốn ghi đè mật khẩu hiện tại.</div>
         </div>
 
         <div class="mb-3">

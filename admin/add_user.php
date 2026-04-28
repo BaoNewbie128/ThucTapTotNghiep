@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/admin_auth_check.php';
 require __DIR__ . "/../config/db.php";
+require_once __DIR__ . "/../validation.php";
 
 $message = "";
 $success = false;
@@ -16,6 +17,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
     if ($username === "" || $email === "" || $password === "") {
         $message = "Username, Email và Password không được để trống!";
+    } elseif (!\Validator::minLength($password, 6)) {
+        $message = "Mật khẩu phải có ít nhất 6 ký tự!";
     } else {
         // Kiểm tra email trùng
         $check = $conn->prepare("SELECT id FROM users WHERE email = ?");
@@ -26,8 +29,8 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         if ($res->num_rows > 0) {
             $message = "Email này đã tồn tại!";
         } else {
-            // Hash mật khẩu
-            $password_hash = password_hash($password, PASSWORD_BCRYPT);
+            // Hash mật khẩu giống register.php trước khi lưu vào DB.
+            $password_hash = password_hash($password, PASSWORD_DEFAULT);
 
             // Insert user
             $stmt = $conn->prepare(
