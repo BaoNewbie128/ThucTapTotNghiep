@@ -102,8 +102,8 @@ $conn->close();
                     <p class="mb-1"><?= nl2br(htmlspecialchars($r['comment'])) ?></p>
                     <small class="text-muted d-block mb-2">Ngày: <?= $r['created_at'] ?></small>
                     <div class="mt-2 d-flex gap-2">
-                        <button class="btn btn-warning btn-sm"
-                            onclick="openEditModal(<?= $r['review_id'] ?>, <?= $r['rating'] ?>, `<?= htmlspecialchars($r['comment'], ENT_QUOTES) ?>`)">
+                        <button class="btn btn-warning btn-sm" type="button"
+                            onclick='openEditModal(<?= $r['review_id'] ?>, <?= $r['rating'] ?>, <?= json_encode($r['comment'], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'>
                             Sửa</button>
                         <form method="POST" action="?view=reviews&page=<?= $page ?>" class="d-inline"
                             onsubmit="return confirm('Xóa đánh giá này?');">
@@ -182,8 +182,8 @@ $conn->close();
                     </div>
 
                     <div class="modal-footer">
-                        <button class="btn btn-primary">Lưu</button>
-                        <button class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
+                        <button type="submit" class="btn btn-primary">Lưu</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hủy</button>
                     </div>
 
                 </form>
@@ -192,11 +192,17 @@ $conn->close();
     </div>
     <script>
     function openEditModal(id, rating, comment) {
+        const modalEl = document.getElementById('editReviewModal');
+
         document.getElementById('edit_review_id').value = id;
         document.getElementById('edit_rating').value = rating;
         document.getElementById('edit_comment').value = comment;
 
-        var modal = new bootstrap.Modal(document.getElementById('editReviewModal'));
+        if (modalEl.parentElement !== document.body) {
+            document.body.appendChild(modalEl);
+        }
+
+        var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
         modal.show();
     }
     </script>
