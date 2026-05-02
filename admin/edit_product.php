@@ -31,8 +31,10 @@
         $stmt = $conn->prepare("UPDATE products SET brand=?, model=?, scale=?, price=?, stock=?, color=?, description=?, image=? WHERE id=?");
         $stmt->bind_param("sssdisssi", $brand, $model, $scale, $price, $stock, $color, $description, $image_name, $id);
           if($stmt->execute()){
-              $success = "Cập nhật sản phẩm thành công!";
-                header("Location: admin_dashboard.php?view=products");
+              $stmt->close();
+              $_SESSION['message'] = "Cập nhật sản phẩm thành công!";
+              $_SESSION['message_type'] = "success";
+              header("Location: admin_dashboard.php?view=products");
               exit; 
           } else {
               $error_message = "Lỗi cập nhật sản phẩm.";

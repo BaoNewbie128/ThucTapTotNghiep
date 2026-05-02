@@ -84,6 +84,8 @@ if (isset($_POST["action"]) && $_POST["action"] === "checkout") {
         $stmt->execute();
         unset($_SESSION['coupon']);
         $conn->commit();
+        $_SESSION['message'] = "Đặt hàng thành công! Cảm ơn bạn đã mua hàng.";
+        $_SESSION['message_type'] = "success";
         header("Location: order_items.php");
         exit;
     } catch (Throwable $e) {

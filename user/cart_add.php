@@ -72,6 +72,8 @@ try {
         $stmt->execute();
     }
     $conn->commit();
+    $_SESSION['message'] = "Đã thêm sản phẩm vào giỏ hàng!";
+    $_SESSION['message_type'] = "success";
     header("Location: /user/cart_item.php");
     exit;
 } catch (Throwable $e) {

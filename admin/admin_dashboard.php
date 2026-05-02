@@ -123,6 +123,24 @@ include __DIR__ . "/../includes/admin_auth_check.php";
             <!-- Main Content -->
             <main class="col-md-9" style="flex: 1;">
                 <?php 
+                    // Hiển thị thông báo từ session
+                    if (isset($_SESSION['message'])) {
+                        $message_type = $_SESSION['message_type'] ?? 'info';
+                        $alert_class = 'alert-info';
+                        if ($message_type === 'success') $alert_class = 'alert-success';
+                        elseif ($message_type === 'danger') $alert_class = 'alert-danger';
+                        elseif ($message_type === 'warning') $alert_class = 'alert-warning';
+                        
+                        echo '<div class="alert ' . $alert_class . ' alert-dismissible fade show" role="alert">';
+                        echo htmlspecialchars($_SESSION['message']);
+                        echo '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+                        echo '</div>';
+                        
+                    // Xóa thông báo sau khi hiển thị
+                        unset($_SESSION['message']);
+                        unset($_SESSION['message_type']);
+                    }
+                    
                     if(isset($_GET["view"]) && $_GET["view"] === "products") {
                         include __DIR__ . "/product_management.php";
                     }
@@ -249,6 +267,7 @@ include __DIR__ . "/../includes/admin_auth_check.php";
                 ?>
             </main>
         </div>
+    </div>
 </body>
 
 </html>

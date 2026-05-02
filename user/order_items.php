@@ -101,6 +101,24 @@
         </a>
         <h2 class="page-title mb-4">Đơn hàng của bạn</h2>
 
+        <?php
+        if (isset($_SESSION['message'])) {
+            $message_type = $_SESSION['message_type'] ?? 'info';
+            $alert_class = 'alert-info';
+            if ($message_type === 'success') $alert_class = 'alert-success';
+            elseif ($message_type === 'danger') $alert_class = 'alert-danger';
+            elseif ($message_type === 'warning') $alert_class = 'alert-warning';
+            
+            echo '<div class="alert ' . $alert_class . ' alert-dismissible fade show" role="alert">';
+            echo htmlspecialchars($_SESSION['message']);
+            echo '<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>';
+            echo '</div>';
+            
+            unset($_SESSION['message']);
+            unset($_SESSION['message_type']);
+        }
+        ?>
+
         <?php if(empty($orderlist)):?>
         <div class="alert alert-info text-center">Không có sản phẩm nào</div>
         <?php endif; ?>
